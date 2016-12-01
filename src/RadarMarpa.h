@@ -48,8 +48,8 @@ class Position;
 class Matrix;
 
 #define NUMBER_OF_TARGETS (20)
-#define OFF_LOCATION (20)
-#define SCAN_MARGIN (200)
+#define OFF_LOCATION (40)
+#define SCAN_MARGIN (100)
 #define SIZE_OF_LOG (20)
 #define MAX_CONTOUR_LENGTH (600)
 #define MAX_LOST_COUNT (5)
@@ -77,25 +77,22 @@ class Position {
   double dlat_dt;   // deg / sec
   double dlon_dt;   // deg / sec
   wxLongLong time;  // millis
-
- /* Position operator-(Position p) {
-    Position q;
-    q.lat = lat - p.lat;
-    q.lon = lon - p.lon;
-    return q;
-  }*/
-  /*Position operator+(Position p) {
-    Position q;
-    q.lat = lat + p.lat;
-    q.lon = lon + p.lon;
-    return q;
-  }*/
 };
 
 class Polar {
  public:
   int angle;
   int r;
+  wxLongLong time;  // wxGetUTCTimeMillis
+};
+
+class LocalPosition{
+    // position in meters relative to own ship position
+public:
+    double lat;
+    double lon;
+    double dlat_dt;  // meters per second
+    double dlon_dt;
 };
 
 Polar Pos2Polar(Position p, Position own_ship, int range);
@@ -106,8 +103,6 @@ class LogEntry {
   Position pos;
   double speed;
   double course;
-  //Position z;  // $$$ test only and
-  //Polar pol_z;  // for output of covariance data
 };
 
 class ArpaTarget {
@@ -123,8 +118,6 @@ class ArpaTarget {
   Polar pol_z;  // polar of the last measured position, ussed for target deletion
   Kalman_Filter* m_kalman;
   wxLongLong t_refresh;  // time of last refresh
-  int nr_of_log_entries;
-  LogEntry logbook[SIZE_OF_LOG];  // stores positions, time course and speed
   double bearing;                 // only valid directly after calculation
   double distance;                // only valid directly after calculation
   unsigned int O_update_counter;
@@ -134,16 +127,12 @@ class ArpaTarget {
   Polar expected;
   int contour_length;
   Polar max_angle, min_angle, max_r, min_r;  // charasterictics of contour
-  void PushLogbook();
-  // void Aquire1NewTarget();
-  int GetContour(Polar* p, Position* z);
+  int GetContour(Polar* p);
   void set(br24radar_pi* pi, RadarInfo* ri);
   bool FindNearestContour(Polar* pol, int dist);
   bool FindContourFromInside(Polar* p);
   bool Pix(int ang, int rad);
-  // void Aquire2NewTarget();
-  void CalculateSpeedandCourse();
-  bool GetTarget(Polar* pol, Position* z);
+  bool GetTarget(Polar* pol);
   void RefreshTarget();
   void PassARPAtoOCPN(Polar* p, OCPN_target_status s);
   void SetStatusLost();
