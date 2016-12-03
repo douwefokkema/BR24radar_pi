@@ -62,6 +62,8 @@ class Matrix;
 //    >=4  active
 #define Q_NUM (2)  // status Q to OCPN at target status 2
 #define T_NUM (5)  // status T to OCPN at target status 5
+#define TARGET_SPEED_DIV_SDEV 2.  // when speed is < TARGET_SPEED_DIV_SDEV * standard_deviation of speed, speed of target  is shown as 0
+#define MAX_DUP 3 // maximum number of sweeps a duplicate target is allowed to exist
 
 typedef int target_status;
 enum OCPN_target_status {
@@ -77,6 +79,7 @@ class Position {
   double dlat_dt;   // deg / sec
   double dlon_dt;   // deg / sec
   wxLongLong time;  // millis
+  double sd_speed_kn;  // standard deviation of the speed in knots
 };
 
 class Polar {
@@ -86,13 +89,14 @@ class Polar {
   wxLongLong time;  // wxGetUTCTimeMillis
 };
 
-class LocalPosition{
-    // position in meters relative to own ship position
-public:
-    double lat;
-    double lon;
-    double dlat_dt;  // meters per second
-    double dlon_dt;
+class LocalPosition {
+  // position in meters relative to own ship position
+ public:
+  double lat;
+  double lon;
+  double dlat_dt;  // meters per second
+  double dlon_dt;
+  double sd_speed_m_s; // standard deviation of the speed m / sec
 };
 
 Polar Pos2Polar(Position p, Position own_ship, int range);
@@ -114,15 +118,13 @@ class ArpaTarget {
   br24radar_pi* m_pi;
   int target_id;
   Position X;   // holds actual position
-  Polar polar;  // recent polar position of the target
-  Polar pol_z;  // polar of the last measured position, ussed for target deletion
+  Polar pol_z;  // polar of the last measured position, used for duplicate detection
+ // Polar pol;  // 
   Kalman_Filter* m_kalman;
   wxLongLong t_refresh;  // time of last refresh
-  double bearing;                 // only valid directly after calculation
-  double distance;                // only valid directly after calculation
-  unsigned int O_update_counter;
   target_status status;
   int lost_count;
+  int duplicate_count;
   Polar contour[MAX_CONTOUR_LENGTH + 1];  // contour of target, only valid immediately after finding it
   Polar expected;
   int contour_length;
@@ -143,12 +145,11 @@ class RadarArpa {
   RadarArpa(br24radar_pi* pi, RadarInfo* ri);
   ~RadarArpa();
 
-  int GetTargetWidth(int angle, int rad);
-  int GetTargetHeight(int angle, int rad);
   ArpaTarget* m_targets;
   br24radar_pi* m_pi;
   RadarInfo* m_ri;
   int NextEmptyTarget();
+  int radar_lost_count;  // all targets will be deleted when radar not seen
 
   void CalculateCentroid(ArpaTarget* t);
   void DrawContour(ArpaTarget t);
@@ -156,6 +157,7 @@ class RadarArpa {
   void RefreshArpaTargets();
   void AquireNewTarget(Position p, int status);
   void DeleteAllTargets();
+  void RemoveDuplicates();
 };
 
 PLUGIN_END_NAMESPACE
