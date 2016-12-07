@@ -51,7 +51,7 @@ class Matrix;
 #define OFF_LOCATION (40)         // target search area in radial direction
 #define SCAN_MARGIN (100)         // number of lines that a next scan of the target may have moved
 #define MAX_CONTOUR_LENGTH (600)  // defines maximal size of target contour
-#define MAX_LOST_COUNT (5)        // number of sweeps that target can be missed before it is seet to lost
+#define MAX_LOST_COUNT (6)        // number of sweeps that target can be missed before it is seet to lost
 #define FOR_DELETION (-2)         // status of a duplicate target used to delete a target
 #define LOST (-1)
 #define AQUIRE0 (0)  // 0 under aquisition, first seen, no contour yet
@@ -76,8 +76,8 @@ class Position {
  public:
   double lat;
   double lon;
-  double dlat_dt;      // deg / sec
-  double dlon_dt;      // deg / sec
+  double dlat_dt;      // m / sec
+  double dlon_dt;      // m / sec
   wxLongLong time;     // millis
   double sd_speed_kn;  // standard deviation of the speed in knots
 };
