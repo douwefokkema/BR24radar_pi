@@ -216,10 +216,6 @@ RadarInfo::RadarInfo(br24radar_pi *pi, int radar) {
   m_state.button = 0;
   m_range.m_settings = &m_pi->m_settings;
 
-  for (size_t z = 0; z < GUARD_ZONES; z++) {
-    m_guard_zone[z] = new GuardZone(pi, radar, z);
-  }
-
   ComputeTargetTrails();
 
   m_timer = new wxTimer(this, TIMER_ID);
@@ -463,7 +459,7 @@ void RadarInfo::ProcessRadarSpoke(SpokeBearing angle, SpokeBearing bearing, UINT
 
   // Douwe likes this, and I think it has some value in testing, but I think it distracts as well.
   // Why don't we make this an option?
-  data[RETURNS_PER_LINE - 1] = 200;  //  range ring, do we want this? ActionL: make setting
+  data[RETURNS_PER_LINE - 1] = 200;  //  range ring, do we want this? ActionL: make setting, switched on for testing
 
 
   if (m_range_meters != range_meters) {
@@ -494,11 +490,11 @@ void RadarInfo::ProcessRadarSpoke(SpokeBearing angle, SpokeBearing bearing, UINT
     }
 
   for (size_t z = 0; z < GUARD_ZONES; z++) {
-    if (m_guard_zone[z]->m_type != GZ_OFF) {
-      m_guard_zone[z]->ProcessSpoke(bearing, data, m_history[bearing].line, len, range_meters);
+    if (m_guard_zone[z]->m_alarm_on) {
+      m_guard_zone[z]->ProcessSpoke(angle, data, m_history[bearing].line, len, range_meters);
     }
   }
-
+  bool test = 1;
   if (m_multi_sweep_filter) {
     for (size_t radius = 0; radius < len; radius++) {
       if (!HISTORY_FILTER_ALLOW(m_history[bearing].line[radius])) { 
@@ -876,28 +872,29 @@ void RadarInfo::RenderGuardZone() {
   GLubyte red = 0, green = 200, blue = 0, alpha = 50;
 
   for (size_t z = 0; z < GUARD_ZONES; z++) {
-    if (m_guard_zone[z]->m_type != GZ_OFF) {
-      if (m_guard_zone[z]->m_type == GZ_CIRCLE) {
-        start_bearing = 0;
-        end_bearing = 359;
-      } else {
-        start_bearing = SCALE_RAW_TO_DEGREES2048(m_guard_zone[z]->m_start_bearing);
-        end_bearing = SCALE_RAW_TO_DEGREES2048(m_guard_zone[z]->m_end_bearing);
+      if (m_guard_zone[z]->m_alarm_on || m_guard_zone[z]->m_arpa_on) {
+          if (m_guard_zone[z]->m_type == GZ_CIRCLE) {
+              start_bearing = 0;
+              end_bearing = 359;
+          }
+          else {
+              start_bearing = SCALE_RAW_TO_DEGREES2048(m_guard_zone[z]->m_start_bearing);
+              end_bearing = SCALE_RAW_TO_DEGREES2048(m_guard_zone[z]->m_end_bearing);
+          }
+          switch (m_pi->m_settings.guard_zone_render_style) {
+          case 1:
+              glColor4ub((GLubyte)255, (GLubyte)0, (GLubyte)0, (GLubyte)255);
+              DrawOutlineArc(m_guard_zone[z]->m_outer_range, m_guard_zone[z]->m_inner_range, start_bearing, end_bearing, true);
+              break;
+          case 2:
+              glColor4ub(red, green, blue, alpha);
+              DrawOutlineArc(m_guard_zone[z]->m_outer_range, m_guard_zone[z]->m_inner_range, start_bearing, end_bearing, false);
+              // fall thru
+          default:
+              glColor4ub(red, green, blue, alpha);
+              DrawFilledArc(m_guard_zone[z]->m_outer_range, m_guard_zone[z]->m_inner_range, start_bearing, end_bearing);
+          }
       }
-      switch (m_pi->m_settings.guard_zone_render_style) {
-        case 1:
-          glColor4ub((GLubyte)255, (GLubyte)0, (GLubyte)0, (GLubyte)255);
-          DrawOutlineArc(m_guard_zone[z]->m_outer_range, m_guard_zone[z]->m_inner_range, start_bearing, end_bearing, true);
-          break;
-        case 2:
-          glColor4ub(red, green, blue, alpha);
-          DrawOutlineArc(m_guard_zone[z]->m_outer_range, m_guard_zone[z]->m_inner_range, start_bearing, end_bearing, false);
-        // fall thru
-        default:
-          glColor4ub(red, green, blue, alpha);
-          DrawFilledArc(m_guard_zone[z]->m_outer_range, m_guard_zone[z]->m_inner_range, start_bearing, end_bearing);
-      }
-    }
 
     red = 0;
     green = 0;
@@ -1050,7 +1047,6 @@ void RadarInfo::RenderRadarImage(DrawInfo *di) {
     g_first_render = false;
     wxLongLong startup_elapsed = wxGetUTCTimeMillis() - m_pi->m_boot_time;
     LOG_INFO(wxT("BR24radar_pi: First radar image rendered after %llu ms\n"), startup_elapsed);
-    
   }
 }
 
@@ -1064,8 +1060,13 @@ void RadarInfo::RenderRadarImage(wxPoint center, double scale, double overlay_ro
 
   overlay_rotate += OPENGL_ROTATION;  // Difference between OpenGL and compass + radar
   double panel_rotate = overlay_rotate;
+  double arpa_rotate = 0.;
   if (m_orientation.value == ORIENTATION_COURSE_UP) {
     panel_rotate -= m_course;
+    arpa_rotate -= m_course;
+  }
+  if (m_orientation.value == ORIENTATION_HEAD_UP) {
+      arpa_rotate = - m_pi->m_hdt;
   }
   double guard_rotate = overlay_rotate;
   if (overlay || m_orientation.value == ORIENTATION_NORTH_UP || m_orientation.value == ORIENTATION_COURSE_UP) {
@@ -1074,16 +1075,17 @@ void RadarInfo::RenderRadarImage(wxPoint center, double scale, double overlay_ro
   if (!overlay && m_orientation.value == ORIENTATION_COURSE_UP) {
     guard_rotate -= m_course;
   }
-
+  if (m_marpa){
+      m_marpa->RefreshArpaTargets();
+  }
   if (overlay) {
-      if (m_marpa){
-          m_marpa->RefreshArpaTargets();
-          glPushMatrix();
-          glTranslated(center.x, center.y, 0);
-          glScaled(scale, scale, 1.);
-          m_marpa->DrawArpaTargets();
-          glPopMatrix();
-      }
+    if (m_marpa) {
+      glPushMatrix();
+      glTranslated(center.x, center.y, 0);
+      glScaled(scale, scale, 1.);
+      m_marpa->DrawArpaTargets();
+      glPopMatrix();
+    }
 
     if (m_pi->m_settings.guard_zone_on_overlay) {
       glPushMatrix();
@@ -1115,6 +1117,14 @@ void RadarInfo::RenderRadarImage(wxPoint center, double scale, double overlay_ro
     glRotated(guard_rotate, 0.0, 0.0, 1.0);
     RenderGuardZone();
     glPopMatrix();
+
+    if (m_marpa) {
+      glPushMatrix();
+      glScaled(scale, scale, 1.);
+      glRotated(arpa_rotate, 0.0, 0.0, 1.0);
+      m_marpa->DrawArpaTargets();
+      glPopMatrix();
+    }
 
     glPushMatrix();
     double overscan = (double)m_range_meters / (double)m_range.value;

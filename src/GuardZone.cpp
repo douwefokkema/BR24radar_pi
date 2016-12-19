@@ -28,6 +28,7 @@
  ***************************************************************************
  */
 
+#include "RadarMarpa.h"
 #include "br24radar_pi.h"
 
 PLUGIN_BEGIN_NAMESPACE
@@ -115,6 +116,112 @@ void GuardZone::ProcessSpoke(SpokeBearing angle, UINT8* data, UINT8* hist, size_
 
   m_last_in_guard_zone = in_guard_zone;
   m_last_angle = angle;
+}
+
+// Search  guard zone for targets
+void GuardZone::SearchTargets() {
+  if (!m_arpa_on) return;
+
+  if (!m_arpa_on) {
+    return;
+  }
+  if (m_ri->m_range_meters == 0) {
+    return;
+  }
+  size_t range_start = m_inner_range * RETURNS_PER_LINE / m_ri->m_range_meters;  // Convert from meters to 0..511
+  size_t range_end = m_outer_range * RETURNS_PER_LINE / m_ri->m_range_meters;    // Convert from meters to 0..511
+
+  SpokeBearing hdt = SCALE_DEGREES_TO_RAW2048(m_pi->m_hdt);
+  SpokeBearing start_bearing = m_start_bearing + hdt;
+  SpokeBearing end_bearing = m_end_bearing + hdt;
+  start_bearing = MOD_ROTATION2048(start_bearing);
+  end_bearing = MOD_ROTATION2048(end_bearing);
+  if (start_bearing > end_bearing) {
+    end_bearing += LINES_PER_ROTATION;
+  }
+  if (m_type == GZ_CIRCLE) {
+    start_bearing = 0;
+    end_bearing = LINES_PER_ROTATION;
+  }
+
+  if (range_start < RETURNS_PER_LINE) {
+    if (range_end > RETURNS_PER_LINE) {
+      range_end = RETURNS_PER_LINE;
+    }
+    if (range_end < range_start) return;
+
+    for (int angle = start_bearing; angle < end_bearing; angle += 2) {
+      // check if this angle has been updated by the beam since last time
+      // and if possible targets have been refreshed
+
+      wxLongLong time1 = m_ri->m_history[MOD_ROTATION2048(angle)].time;
+      wxLongLong time2 = m_ri->m_history[MOD_ROTATION2048(angle + 2 * SCAN_MARGIN)].time;
+
+      // check if target has been refreshed since last time
+      // and if the beam has passed the target location with SCAN_MARGIN spokes
+      if ((time1 > (arpa_update_time[MOD_ROTATION2048(angle)] + SCAN_MARGIN2) &&
+           time2 >= time1)) {  // the beam sould have passed our "angle" AND a point SCANMARGIN further
+                               // set new refresh time
+        arpa_update_time[MOD_ROTATION2048(angle)] = time1;
+        for (int rrr = (int)range_start; rrr < (int)range_end; rrr++) {
+          if (MultiPix(angle, rrr)) {
+            bool next_r = false;
+            // check all targets if this pixel is within the area of the target
+            for (int i = 0; i < m_ri->m_marpa->number_of_targets; i++) {
+              if (!m_ri->m_marpa->m_targets[i]) continue;
+              ArpaTarget* t = m_ri->m_marpa->m_targets[i];
+              if (t->status == LOST) {
+                continue;
+              }
+              int min_ang = t->min_angle.angle - 1;
+              int max_ang = t->max_angle.angle + 1;
+              unsigned int tim1 = arpa_update_time[MOD_ROTATION2048(angle)].GetLo();
+              if (t->min_r.r <= rrr && t->max_r.r >= rrr &&
+                  ((min_ang <= angle && max_ang >= angle) ||
+                   ((min_ang <= angle + LINES_PER_ROTATION) && (max_ang >= angle + LINES_PER_ROTATION)) ||
+                   ((min_ang <= angle - LINES_PER_ROTATION && max_ang >= angle - LINES_PER_ROTATION)))) {
+                rrr = t->max_r.r + 1;  // skip rest of this blob
+                next_r = true;
+                break;  // get out of target loop
+              }
+            }  // end loop over targets
+            if (next_r) continue;
+            // pixel found that does not belong to a known target
+            Position own_pos;
+            Polar pol;
+            pol.angle = angle;
+            pol.r = rrr;
+            own_pos.lat = m_pi->m_ownship_lat;
+            own_pos.lon = m_pi->m_ownship_lon;
+            Position x;
+            x = Polar2Pos(pol, own_pos, m_ri->m_range_meters);
+            int target_i;
+            m_ri->m_marpa->AquireNewTarget(pol, 0, &target_i);
+            if (target_i == -1) break;                            // $$$ how to handle max targets exceeded
+            m_ri->m_marpa->m_targets[target_i]->RefreshTarget();  // make first contour and max min values
+          }                                                       
+        }
+      }
+    }
+  }
+  return;
+}
+
+bool GuardZone::Pix(int ang, int rad) {
+  if (rad < 1 || rad >= RETURNS_PER_LINE - 1) {  //  avoid range ring
+    return false;
+  }
+  return ((m_ri->m_history[MOD_ROTATION2048(ang)].line[rad] & 1) != 0);
+}
+
+bool GuardZone::MultiPix(int ang, int rad) {
+    // same as Pix, but only true if a blob of at least 3 pixels was found
+    int test = 0;
+    if (Pix(ang, rad)){
+        test = Pix(ang + 1, rad) + Pix(ang - 1, rad) + Pix(ang, rad + 1) + Pix(ang, rad - 1);
+    }
+    if (test < 2) return false;
+    else return true;
 }
 
 PLUGIN_END_NAMESPACE

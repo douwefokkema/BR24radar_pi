@@ -47,23 +47,33 @@ class Kalman_Filter;
 class Position;
 class Matrix;
 
-#define NUMBER_OF_TARGETS (20)
-#define OFF_LOCATION (40)         // target search area in radial direction
+#define MAX_NUMBER_OF_TARGETS (100)  // real max numer of targets is 1 less
+#define OFF_LOCATION (50)  // target search area in radial direction
+//#define ARPA_DETECT_MARGIN (20)   // margin needed for ARPA to eperate targets
 #define SCAN_MARGIN (100)         // number of lines that a next scan of the target may have moved
-#define MAX_CONTOUR_LENGTH (600)  // defines maximal size of target contour
-#define MAX_LOST_COUNT (6)        // number of sweeps that target can be missed before it is seet to lost
-#define FOR_DELETION (-2)         // status of a duplicate target used to delete a target
+#define MAX_CONTOUR_LENGTH (601)  // defines maximal size of target contour
+#define MIN_CONTOUR_LENGTH (4)
+#define MAX_LOST_COUNT (4)  // number of sweeps that target can be missed before it is seet to lost
+
+#define FOR_DELETION (-2)  // status of a duplicate target used to delete a target
 #define LOST (-1)
 #define AQUIRE0 (0)  // 0 under aquisition, first seen, no contour yet
 #define AQUIRE1 (1)  // 1 under aquisition, contour found, first position FOUND
 #define AQUIRE2 (2)  // 2 under aquisition, speed and course taken
 #define AQUIRE3 (3)  // 3 under aquisition, speed and course verified, next time active
                      //    >=4  active
-#define Q_NUM (2)    // status Q to OCPN at target status 2
-#define T_NUM (5)    // status T to OCPN at target status 5
-#define TARGET_SPEED_DIV_SDEV \
-  2.               // when speed is < TARGET_SPEED_DIV_SDEV * standard_deviation of speed, speed of target  is shown as 0
-#define MAX_DUP 3  // maximum number of sweeps a duplicate target is allowed to exist
+
+#define Q_NUM (4)  // status Q to OCPN at target status
+#define T_NUM (6)  // status T to OCPN at target status
+
+#define TARGET_SPEED_DIV_SDEV 2.
+#define MAX_DUP 2  // maximum number of sweeps a duplicate target is allowed to exist
+#define SCAN_MARGIN2 (500)
+#define STATUS_TO_OCPN (4)  //
+#define NOISE (0.13)        // Allowed covariance of target speed in lat and lon
+                            // critical for the performance of target tracking
+                            // lower value makes target go straight
+                            // higher values allow target to make curves
 
 typedef int target_status;
 enum OCPN_target_status {
@@ -88,6 +98,8 @@ class Polar {
   int r;
   wxLongLong time;  // wxGetUTCTimeMillis
 };
+
+Position Polar2Pos(Polar pol, Position own_ship, double range);
 
 class LocalPosition {
   // position in meters relative to own ship position
@@ -133,6 +145,7 @@ class ArpaTarget {
   bool FindNearestContour(Polar* pol, int dist);
   bool FindContourFromInside(Polar* p);
   bool Pix(int ang, int rad);
+  bool MultiPix(int ang, int rad);
   bool GetTarget(Polar* pol);
   void RefreshTarget();
   void PassARPAtoOCPN(Polar* p, OCPN_target_status s);
@@ -144,16 +157,20 @@ class RadarArpa {
   RadarArpa(br24radar_pi* pi, RadarInfo* ri);
   ~RadarArpa();
 
-  ArpaTarget* m_targets;
+  ArpaTarget* m_targets[MAX_NUMBER_OF_TARGETS];
   br24radar_pi* m_pi;
   RadarInfo* m_ri;
-  int NextEmptyTarget();
+
+  //  wxLongLong time_refresh;  // wxGetUTCTimeMillis
+//  wxLongLong arpa_update_time[LINES_PER_ROTATION];
+  int number_of_targets;
   int radar_lost_count;  // all targets will be deleted when radar not seen
   void CalculateCentroid(ArpaTarget* t);
-  void DrawContour(ArpaTarget t);
+  void DrawContour(ArpaTarget* t);
   void DrawArpaTargets();
   void RefreshArpaTargets();
   void AquireNewTarget(Position p, int status);
+  void AquireNewTarget(Polar pol, int status, int* target_i);
   void DeleteAllTargets();
 };
 
