@@ -53,7 +53,7 @@ class Matrix;
 #define SCAN_MARGIN (100)         // number of lines that a next scan of the target may have moved
 #define MAX_CONTOUR_LENGTH (601)  // defines maximal size of target contour
 #define MIN_CONTOUR_LENGTH (4)
-#define MAX_LOST_COUNT (4)  // number of sweeps that target can be missed before it is seet to lost
+#define MAX_LOST_COUNT (5)  // number of sweeps that target can be missed before it is seet to lost
 
 #define FOR_DELETION (-2)  // status of a duplicate target used to delete a target
 #define LOST (-1)
@@ -66,10 +66,10 @@ class Matrix;
 #define Q_NUM (4)  // status Q to OCPN at target status
 #define T_NUM (6)  // status T to OCPN at target status
 
-#define TARGET_SPEED_DIV_SDEV 2.
-#define MAX_DUP 2  // maximum number of sweeps a duplicate target is allowed to exist
+#define TARGET_SPEED_DIV_SDEV 3.
+#define MAX_DUP 3  // maximum number of sweeps a duplicate target is allowed to exist
 #define SCAN_MARGIN2 (500)
-#define STATUS_TO_OCPN (4)  //
+#define STATUS_TO_OCPN (5)  //
 #define NOISE (0.13)        // Allowed covariance of target speed in lat and lon
                             // critical for the performance of target tracking
                             // lower value makes target go straight
@@ -134,6 +134,10 @@ class ArpaTarget {
   Kalman_Filter* m_kalman;
   wxLongLong t_refresh;  // time of last refresh
   target_status status;
+  double speed_kn;
+  double course;
+  int stationary;   // number of sweeps target was stationary
+  bool arpa;
   int lost_count;
   int duplicate_count;
   Polar contour[MAX_CONTOUR_LENGTH + 1];  // contour of target, only valid immediately after finding it
