@@ -48,7 +48,7 @@ class Position;
 class Matrix;
 
 #define MAX_NUMBER_OF_TARGETS (100)  // real max numer of targets is 1 less
-#define OFF_LOCATION (50)  // target search area in radial direction
+#define OFF_LOCATION (20)  // target search area in radial direction
 //#define ARPA_DETECT_MARGIN (20)   // margin needed for ARPA to eperate targets
 #define SCAN_MARGIN (100)         // number of lines that a next scan of the target may have moved
 #define MAX_CONTOUR_LENGTH (601)  // defines maximal size of target contour
@@ -148,12 +148,11 @@ class ArpaTarget {
   void set(br24radar_pi* pi, RadarInfo* ri);
   bool FindNearestContour(Polar* pol, int dist);
   bool FindContourFromInside(Polar* p);
-  bool Pix(int ang, int rad);
-  bool MultiPix(int ang, int rad);
   bool GetTarget(Polar* pol);
   void RefreshTarget();
   void PassARPAtoOCPN(Polar* p, OCPN_target_status s);
   void SetStatusLost();
+  void ResetPixels();
 };
 
 class RadarArpa {
@@ -164,6 +163,7 @@ class RadarArpa {
   ArpaTarget* m_targets[MAX_NUMBER_OF_TARGETS];
   br24radar_pi* m_pi;
   RadarInfo* m_ri;
+  bool target_refreshed;
 
   //  wxLongLong time_refresh;  // wxGetUTCTimeMillis
 //  wxLongLong arpa_update_time[LINES_PER_ROTATION];
@@ -176,6 +176,8 @@ class RadarArpa {
   void AquireNewTarget(Position p, int status);
   void AquireNewTarget(Polar pol, int status, int* target_i);
   void DeleteAllTargets();
+  bool Pix(int ang, int rad);
+  bool MultiPix(int ang, int rad);
 };
 
 PLUGIN_END_NAMESPACE
