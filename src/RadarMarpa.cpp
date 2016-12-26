@@ -882,9 +882,8 @@ void ArpaTarget::PassARPAtoOCPN(Polar* pol, OCPN_target_status status) {
   // Douwe - Just an example of "my" array - take or leave what you want
   // Check what's in ais_in_arpa[] for more info. Want ships name??
   // This may be an inefficient place to do do this. Would be done earlier
-    double arpaLat = 57.123456, arpaLon = 11.123456; // Temp Dummy. Put your lat/lon in the function call
-    arpaLat = m_pi->ais_in_arpa[0].ais_lat;
-    arpaLon = m_pi->ais_in_arpa[0].ais_lon;
+    double arpaLat = m_pi->ais_in_arpa[0].ais_lat;// Temp Dummy. Put your lat/lon in the function call
+    double arpaLon = m_pi->ais_in_arpa[0].ais_lon;
     int posOffset = 10; // look say 50 meters around, (Rather course? check function)
     if (!m_pi->FindAIS_at_arpaPos(arpaLat, arpaLon, posOffset) || status == L ) PushNMEABuffer(nmea);
 
