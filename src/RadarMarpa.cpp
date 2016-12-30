@@ -612,7 +612,6 @@ void ArpaTarget::RefreshTarget(int dist) {
  //   LOG_INFO(wxT("BR24radar_pi: $$$ average speed_kn= %f, X.sd_speed_kn= %f, target_id %i status= %i, X.dlat_dt %f, X.dlon_dt %f"),
       /*  speed_kn, X.sd_speed_kn, target_id, status, X.dlat_dt, X.dlon_dt);*/
 
-
     if (speed_kn < (double)TARGET_SPEED_DIV_SDEV * X.sd_speed_kn) {
       speed_kn = 0.;
       course = 0.;
@@ -635,10 +634,16 @@ void ArpaTarget::RefreshTarget(int dist) {
         // if target was not seen last sweep, colot yellow
         s = Q;
       }
-      PassARPAtoOCPN(&pol, s);
+      // Check for AIS target at (M)ARPA position
+      int posOffset = 30; // look 60 meters around,
+      if (!m_pi->FindAIS_at_arpaPos(X.lat, X.lon, posOffset)) {
+          PassARPAtoOCPN(&pol, s);
+      } else { //Wipe out a already present ARPA symbol
+          SetStatusLost(); 
+      }
+      //PassARPAtoOCPN(&pol, s);
     }
   }
-
   return;
 }
 

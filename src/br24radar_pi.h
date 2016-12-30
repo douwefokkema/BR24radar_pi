@@ -325,6 +325,16 @@ struct scan_line {
   // a 1 is added in the rightmost position, if below threshold, a 0.
 };
 
+//Table for AIS targets inside ARPA zone
+#define SIZEAISAR (50)
+struct AisArpa {
+    long ais_mmsi;
+    time_t ais_time_upd;
+    double ais_lat;
+    double ais_lon;
+    wxString ais_name;
+};
+
 //----------------------------------------------------------------------------------------------------------
 //    The PlugIn Class Definition
 //----------------------------------------------------------------------------------------------------------
@@ -454,6 +464,12 @@ class br24radar_pi : public opencpn_plugin_112 {
   // Timed Transmit
   time_t m_idle_standby;   // When we will change to standby
   time_t m_idle_transmit;  // When we will change to transmit
+
+  //Check for AIS targets inside ARPA zone
+  wxString JsonAIS; //Temp for Json AIS message
+  AisArpa ais_in_arpa[SIZEAISAR];
+  int count_ais_in_arpa;
+  bool FindAIS_at_arpaPos(const double &lat, const double &lon, const int &dist);
 
  private:
   void RadarSendState(void);
