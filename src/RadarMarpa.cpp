@@ -607,10 +607,10 @@ void ArpaTarget::RefreshTarget(int dist) {
 
     
  //   LOG_INFO(wxT("BR24radar_pi: $$$ speed_kn= %f, X.sd_speed_kn= %f, target_id %i status= %i, X.dlat_dt %f, X.dlon_dt %f"),
-        speed_kn, X.sd_speed_kn, target_id, status, X.dlat_dt, X.dlon_dt);
+ //       speed_kn, X.sd_speed_kn, target_id, status, X.dlat_dt, X.dlon_dt);
     GetSpeed();
  //   LOG_INFO(wxT("BR24radar_pi: $$$ average speed_kn= %f, X.sd_speed_kn= %f, target_id %i status= %i, X.dlat_dt %f, X.dlon_dt %f"),
-        speed_kn, X.sd_speed_kn, target_id, status, X.dlat_dt, X.dlon_dt);
+ //       speed_kn, X.sd_speed_kn, target_id, status, X.dlat_dt, X.dlon_dt);
 
 
     if (speed_kn < (double)TARGET_SPEED_DIV_SDEV * X.sd_speed_kn) {
@@ -636,23 +636,15 @@ void ArpaTarget::RefreshTarget(int dist) {
         s = Q;
       }
       // Check for AIS target at (M)ARPA position
-      // Douwe - Just an example of "my" array - take or leave what you want
-      // Check what's in ais_in_arpa[] for more info. Want ships name??
-      // ARPA status L is still passing, ~Row 810.
-      // and we may instead check for AIS earlier to directly send L to an existing ARPA?
-      double arpaLat = m_pi->ais_in_arpa[0].ais_lat;// Temp for debug. Put your lat/lon in the function call
-      double arpaLon = m_pi->ais_in_arpa[0].ais_lon;
-      arpaLat = X.lat; // Is X.lat last known pos?? If OK put it direct in the function call
-      arpaLon = X.lon;
-      int posOffset = 90; // look say 50 meters around, (Rather course? check function)
-      if (!m_pi->FindAIS_at_arpaPos(arpaLat, arpaLon, posOffset)) {
+      int posOffset = 30; // look 60 meters around,
+      if (!m_pi->FindAIS_at_arpaPos(X.lat, X.lon, posOffset)) {
           PassARPAtoOCPN(&pol, s);
-      } else { SetStatusLost(); } //Quick idea, will this work??
-
+      } else { //Wipe out a already present ARPA symbol
+          SetStatusLost(); 
+      }
       //PassARPAtoOCPN(&pol, s);
     }
   }
-
   return;
 }
 
