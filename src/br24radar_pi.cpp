@@ -189,7 +189,6 @@ int br24radar_pi::Init(void) {
   //Silly, but could there be old scrap in memory location? (Debug exp.)
   for (int i = 0; i < SIZEAISAR; i++) {
       ais_in_arpa[i].ais_mmsi = 0;
-      ais_in_arpa[i].ais_name = wxEmptyString;
   }
   
   m_heading_source = HEADING_NONE;
@@ -1119,6 +1118,7 @@ bool br24radar_pi::LoadConfig(void) {
       pConf->Read(wxT("AlarmPosY"), &y, 175);
       m_settings.alarm_pos = wxPoint(x, y);
       pConf->Read(wxT("EnableCOGHeading"), &m_settings.enable_cog_heading, false);
+      pConf->Read(wxT("AISatARPAoffset"), &m_settings.AISatARPAoffset, 35);
     }
 
     pConf->Read(wxT("AlertAudioFile"), &m_settings.alert_audio_file, m_shareLocn + wxT("alarm.wav"));
@@ -1213,6 +1213,7 @@ bool br24radar_pi::SaveConfig(void) {
     pConf->Write(wxT("TrailsOnOverlay"), m_settings.trails_on_overlay);
     pConf->Write(wxT("Transparency"), m_settings.overlay_transparency);
     pConf->Write(wxT("VerboseLog"), m_settings.verbose);
+    pConf->Write(wxT("AISatARPAoffset"), m_settings.AISatARPAoffset);
 
     for (int r = 0; r < RADARS; r++) {
       pConf->Write(wxString::Format(wxT("Radar%dRotation"), r), m_radar[r]->m_orientation.value);
@@ -1379,7 +1380,6 @@ void br24radar_pi::SetPluginMessage(wxString &message_id, wxString &message_body
                   f_AISLat >(m_ownship_lat - d_side)      &&
                   f_AISLon < (m_ownship_lon + d_side * 2) &&
                   f_AISLon >(m_ownship_lon - d_side * 2) ) {
-                  wxString AISName = message.Get(_T("shipname"), wxEmptyString).AsString();
                   bool turn = false;
                   for (int i = 0; i < SIZEAISAR; i++) {
                       if (!turn && ais_in_arpa[i].ais_mmsi == json_ais_mmsi) {
@@ -1394,12 +1394,13 @@ void br24radar_pi::SetPluginMessage(wxString &message_id, wxString &message_body
                               ais_in_arpa[i].ais_time_upd = time(0);
                               ais_in_arpa[i].ais_lat = f_AISLat;
                               ais_in_arpa[i].ais_lon = f_AISLon;
-                              ais_in_arpa[i].ais_name = AISName.Trim().Truncate(11);
+                              ais_in_arpa[i].ais_name = message.Get(_T("shipname"), wxEmptyString) \
+                                                        .AsString().Trim().Truncate(12);
                               count_ais_in_arpa++;
                               break;
                           }
                       } else {  //mmsi not in list. Search an empty post from start.
-                          i = -1; //To use also post 0
+                          i = -1;
                           turn = true;
                       }
                   }
@@ -1432,8 +1433,8 @@ bool br24radar_pi::FindAIS_at_arpaPos(const double &lat, const double &lon, cons
         if (ais_in_arpa[i].ais_mmsi != 0) { //Avtive post
             if (lat + offset > ais_in_arpa[i].ais_lat       &&
                 lat - offset < ais_in_arpa[i].ais_lat       &&
-                lon + (offset * 2) > ais_in_arpa[i].ais_lon &&
-                lon - (offset * 2) < ais_in_arpa[i].ais_lon) {
+                lon + (offset * 1.75) > ais_in_arpa[i].ais_lon &&
+                lon - (offset * 1.75) < ais_in_arpa[i].ais_lon) {
                 hit = true;
                 Msg << _T("ARPA at:\n")             <<
                     _T("Lat: ") << lat << _T("\n") <<
