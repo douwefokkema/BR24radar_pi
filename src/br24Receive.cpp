@@ -59,9 +59,9 @@ struct ListenAddress {
 
 static const ListenAddress LISTEN_DATA[2] = { { 6132, "236.6.7.100" }, { 6135, "236.6.7.103" } };
 
-static const ListenAddress LISTEN_REPORT[2] = { { 6679, "236.6.7.102" }, { 6134, "236.6.7.15" } };
+static const ListenAddress LISTEN_REPORT[2] = { { 6134, "236.6.7.102" }, { 6137, "236.6.7.105" } };
 
-static const ListenAddress LISTEN_COMMAND[2] = { { 6680, "236.6.7.105" }, { 6137, "236.6.7.14" } };
+static const ListenAddress LISTEN_COMMAND[2] = { { 6133, "236.6.7.101" }, { 6136, "236.6.7.104" } };
 
 
 // A marker that uniquely identifies BR24 generation scanners, as opposed to 4G(eneration)
@@ -168,7 +168,6 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
   double lon = m_pi->m_ownship_lon;
  // logBinaryData(wxT("$$$ProcessFrame"), data, len);
   // log_line.time_rec = wxGetUTCTimeMillis();
-  LOG_INFO(wxT("BR24radar_pi: $$$ process frame called"));
   wxLongLong time_rec = wxGetUTCTimeMillis();
 
   radar_frame_pkt *packet = (radar_frame_pkt *)data;
@@ -236,7 +235,7 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
       }
     } else {
       // 4G mode
-    //    LOG_INFO(wxT("BR24radar_pi: %s $$$is Navico type 4G or Halo"), m_ri->m_name.c_str());
+    //    LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
       short int large_range = (line->br4g.largerange[1] << 8) | line->br4g.largerange[0];
       short int small_range = (line->br4g.smallrange[1] << 8) | line->br4g.smallrange[0];
       angle_raw = (line->br4g.angle[1] << 8) | line->br4g.angle[0];
@@ -252,7 +251,7 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
       }
       range_meters = range_raw / 4;
       if (m_ri->m_radar_type != RT_4G) {
-        LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G"), m_ri->m_name.c_str());
+        LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
         m_ri->m_radar_type = RT_4G;
         m_pi->m_pMessageBox->SetRadarType(RT_4G);
       }
