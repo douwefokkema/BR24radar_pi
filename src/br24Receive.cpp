@@ -51,11 +51,18 @@ struct ListenAddress {
   const char *address;
 };
 
-static const ListenAddress LISTEN_DATA[2] = {{6678, "236.6.7.8"}, {6657, "236.6.7.13"}};
+//static const ListenAddress LISTEN_DATA[2] = {{6678, "236.6.7.8"}, {6657, "236.6.7.13"}};
+//
+//static const ListenAddress LISTEN_REPORT[2] = {{6679, "236.6.7.9"}, {6659, "236.6.7.15"}};
+//
+//static const ListenAddress LISTEN_COMMAND[2] = {{6680, "236.6.7.10"}, {6658, "236.6.7.14"}};
 
-static const ListenAddress LISTEN_REPORT[2] = {{6679, "236.6.7.9"}, {6659, "236.6.7.15"}};
+static const ListenAddress LISTEN_DATA[2] = { { 6132, "236.6.7.100" }, { 6135, "236.6.7.103" } };
 
-static const ListenAddress LISTEN_COMMAND[2] = {{6680, "236.6.7.10"}, {6658, "236.6.7.14"}};
+static const ListenAddress LISTEN_REPORT[2] = { { 6679, "236.6.7.102" }, { 6134, "236.6.7.15" } };
+
+static const ListenAddress LISTEN_COMMAND[2] = { { 6680, "236.6.7.105" }, { 6137, "236.6.7.14" } };
+
 
 // A marker that uniquely identifies BR24 generation scanners, as opposed to 4G(eneration)
 // Note that 3G scanners are BR24's with better power, so they are more BR24+ than 4G-.
@@ -101,17 +108,17 @@ struct br24_header {
 };                       /* total size = 24 */
 
 struct br4g_header {
-  UINT8 headerLen;       // 1 bytes
-  UINT8 status;          // 1 bytes
-  UINT8 scan_number[2];  // 2 bytes, 0-4095
-  UINT8 u00[2];          // Always 0x4400 (integer)
-  UINT8 largerange[2];   // 2 bytes or -1
-  UINT8 angle[2];        // 2 bytes
-  UINT8 heading[2];      // 2 bytes heading with RI-10/11 or -1. See bitmask explanation above.
-  UINT8 smallrange[2];   // 2 bytes or -1
-  UINT8 rotation[2];     // 2 bytes, rotation/angle
-  UINT8 u02[4];          // 4 bytes signed integer, always -1
-  UINT8 u03[4];          // 4 bytes signed integer, mostly -1 (0x80 in last byte) or 0xa0 in last byte
+  UINT8 headerLen;       // 0 1 bytes
+  UINT8 status;          // 1 1 bytes
+  UINT8 scan_number[2];  // 2-3 2 bytes, 0-4095
+  UINT8 u00[2];          // 4-5 Always 0x4400 (integer)
+  UINT8 largerange[2];   // 6-7 2 bytes or -1
+  UINT8 angle[2];        // 8-9 2 bytes
+  UINT8 heading[2];      // 10-11 2 bytes heading with RI-10/11 or -1. See bitmask explanation above.
+  UINT8 smallrange[2];   // 12-13 2 bytes or -1
+  UINT8 rotation[2];     // 14-15 2 bytes, rotation/angle
+  UINT8 u02[4];          // 16-19 4 bytes signed integer, always -1
+  UINT8 u03[4];          // 20-23 4 bytes signed integer, mostly -1 (0x80 in last byte) or 0xa0 in last byte
 };                       /* total size = 24 */
 
 struct radar_line {
@@ -159,7 +166,9 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
   time_t now = time(0);
   double lat = m_pi->m_ownship_lat;
   double lon = m_pi->m_ownship_lon;
+ // logBinaryData(wxT("$$$ProcessFrame"), data, len);
   // log_line.time_rec = wxGetUTCTimeMillis();
+  LOG_INFO(wxT("BR24radar_pi: $$$ process frame called"));
   wxLongLong time_rec = wxGetUTCTimeMillis();
 
   radar_frame_pkt *packet = (radar_frame_pkt *)data;
@@ -227,6 +236,7 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
       }
     } else {
       // 4G mode
+    //    LOG_INFO(wxT("BR24radar_pi: %s $$$is Navico type 4G or Halo"), m_ri->m_name.c_str());
       short int large_range = (line->br4g.largerange[1] << 8) | line->br4g.largerange[0];
       short int small_range = (line->br4g.smallrange[1] << 8) | line->br4g.smallrange[0];
       angle_raw = (line->br4g.angle[1] << 8) | line->br4g.angle[0];
@@ -252,7 +262,7 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
     {
       IF_LOG_AT(LOGLEVEL_RECEIVE,
                 logBinaryData(wxString::Format(wxT("range=%d, angle=%d hdg=%d"), range_raw, angle_raw, heading_raw),
-                              (uint8_t *)&line->br24, sizeof(line->br24)));
+                              (uint8_t *)&line->br24, 8));
     }
 
     bool radar_heading_valid = HEADING_VALID(heading_raw);
@@ -262,13 +272,16 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
 
     if (radar_heading_valid && !m_pi->m_settings.ignore_radar_heading) {
       heading = MOD_DEGREES(SCALE_RAW_TO_DEGREES(MOD_ROTATION(heading_raw)));
+     // LOG_INFO(wxT("BR24radar_pi: %s $$$heading on radar %i, %f"), m_ri->m_name.c_str(), heading_raw, heading);
       m_pi->SetRadarHeading(heading, radar_heading_true);
+      
     } else {  // no heading on radar
       if (m_pi->m_heading_source == HEADING_RADAR_HDM || m_pi->m_heading_source == HEADING_RADAR_HDT)
         m_pi->m_heading_source = HEADING_NONE;  // let other heading source take over
       m_pi->SetRadarHeading();
       // Guess the heading for the spoke. This is updated much less frequently than the
       // data from the radar (which is accurate 10x per second), likely once per second.
+      LOG_INFO(wxT("BR24radar_pi: %s no heading on radar "), m_ri->m_name.c_str());
     }
     heading_raw = SCALE_DEGREES_TO_RAW(m_pi->GetHeadingTrue());  // include variation
     bearing_raw = angle_raw + heading_raw;
