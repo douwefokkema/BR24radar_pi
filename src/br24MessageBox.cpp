@@ -445,6 +445,9 @@ void br24MessageBox::SetRadarType(RadarType radar_type) {
     case RT_4G:
       s = wxT("4G");
       break;
+    case Halo:
+        s = wxT("Halo");
+        break;
   }
   if (m_pi->m_settings.emulator_on) {
     s << wxT(" ") << _("Emulator");

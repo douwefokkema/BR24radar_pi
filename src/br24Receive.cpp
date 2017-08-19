@@ -221,8 +221,9 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
     short int rotation_raw;
     int range_meters = 0;
 
-    heading_raw = (line->common.heading[1] << 8) | line->common.heading[0];
-
+    heading_raw = ((line->common.heading[1] & 15) << 8) | line->common.heading[0];  // this change also applies to 4G
+    unsigned int large_range;  // for Halo unsigned
+    unsigned int small_range;
     if (memcmp(line->br24.mark, BR24MARK, sizeof(BR24MARK)) == 0) {
       // BR24 and 3G mode
       range_raw = ((line->br24.range[2] & 0xff) << 16 | (line->br24.range[1] & 0xff) << 8 | (line->br24.range[0] & 0xff));
@@ -236,8 +237,8 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
     } else {
       // 4G mode
     //    LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
-      short int large_range = (line->br4g.largerange[1] << 8) | line->br4g.largerange[0];
-      short int small_range = (line->br4g.smallrange[1] << 8) | line->br4g.smallrange[0];
+      large_range = (line->br4g.largerange[1] << 8) | line->br4g.largerange[0];
+      small_range = (line->br4g.smallrange[1] << 8) | line->br4g.smallrange[0];
       angle_raw = (line->br4g.angle[1] << 8) | line->br4g.angle[0];
       rotation_raw = (line->br4g.rotation[1] << 8) | line->br4g.rotation[0];
       if (large_range == 0x80) {
@@ -245,11 +246,25 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
           range_raw = 0;  // Invalid range received
         } else {
           range_raw = small_range;
+          range_meters = range_raw / 4;
         }
       } else {
-        range_raw = large_range * 256;
+      //  range_raw = large_range * 256;  // for 4G
+          if (small_range == 512) {
+              range_raw = large_range; // for Halo
+            
+              LOG_INFO(wxT("BR24radar_pi: $$$ small range is 512 small_range = %d, large_range= %d"), small_range, large_range);
+              
+          }
+          else {
+              range_raw = 0;  // Invalid range received
+              
+              LOG_INFO(wxT("BR24radar_pi: $$$ invalid range small_range = %d, large_range= %d"), small_range, large_range);
+          
+          }
+          range_meters = range_raw;
       }
-      range_meters = range_raw / 4;
+ //     range_meters = range_raw / 4;  // for 4G
       if (m_ri->m_radar_type != RT_4G) {
         LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
         m_ri->m_radar_type = RT_4G;
@@ -260,8 +275,9 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
     // if (angle_raw < 4) {
     {
       IF_LOG_AT(LOGLEVEL_RECEIVE,
-                logBinaryData(wxString::Format(wxT("range=%d, angle=%d hdg=%d"), range_raw, angle_raw, heading_raw),
-                              (uint8_t *)&line->br24, 8));
+                logBinaryData(wxString::Format(wxT("range=%d, angle=%d hdg=%d small range=%d, large range=%d, range_meters=%d"), range_raw, angle_raw, heading_raw,
+                small_range, large_range, range_meters),
+                (uint8_t *)&line->br24, sizeof(line->br24)));
     }
 
     bool radar_heading_valid = HEADING_VALID(heading_raw);
@@ -323,8 +339,8 @@ void br24Receive::EmulateFakeBuffer(void) {
   int range_meters = 2308;
   int display_range_meters = 3000;
   int spots = 0;
-  m_ri->m_radar_type = RT_4G;  // Fake for emulator
-  m_pi->m_pMessageBox->SetRadarType(RT_4G);
+  m_ri->m_radar_type = Halo;  // Fake for emulator
+  m_pi->m_pMessageBox->SetRadarType(Halo);
   m_ri->m_range.Update(display_range_meters);
 
   for (int scanline = 0; scanline < scanlines_in_packet; scanline++) {
@@ -565,7 +581,7 @@ void *br24Receive::Entry(void) {
         if (r > 0 && rx_addr.addr.ss_family == AF_INET) {
           wxString addr;
           addr.Printf(wxT("%u.%u.%u.%u"), a[0], a[1], a[2], a[3]);
-          IF_LOG_AT(LOGLEVEL_RECEIVE, logBinaryData(wxString::Format(wxT("%s sent command"), addr.c_str()), data, r));
+          IF_LOG_AT(LOGLEVEL_RECEIVE, logBinaryData(wxString::Format(wxT("%s receive command"), addr.c_str()), data, r));
           ProcessCommand(addr, data, r);
           no_data_timeout = SECONDS_SELECT(-15);
         } else {
@@ -783,10 +799,10 @@ bool br24Receive::ProcessReport(const UINT8 *report, int len) {
   IF_LOG_AT(LOGLEVEL_RECEIVE, logBinaryData(wxT("ProcessReport"), report, len));
 
   if (m_ri->m_radar == 1) {
-    if (m_ri->m_radar_type != RT_4G) {
+    if (m_ri->m_radar_type != Halo) {
       //   LOG_INFO(wxT("BR24radar_pi: Radar report from 2nd radar tells us this a Navico 4G"));
-      m_ri->m_radar_type = RT_4G;
-      m_pi->m_pMessageBox->SetRadarType(RT_4G);
+      m_ri->m_radar_type = Halo;
+      m_pi->m_pMessageBox->SetRadarType(Halo);
     }
   }
 
@@ -851,7 +867,7 @@ bool br24Receive::ProcessReport(const UINT8 *report, int len) {
             if (m_ri->m_radar_type == RT_UNKNOWN) {
               LOG_INFO(wxT("BR24radar_pi: Radar report tells us this a Navico BR24"));
               m_ri->m_radar_type = RT_BR24;
-              m_pi->m_pMessageBox->SetRadarType(RT_BR24);
+              m_pi->m_pMessageBox->SetRadarType(Halo);
             }
             break;
           case 0x08:
@@ -864,8 +880,8 @@ bool br24Receive::ProcessReport(const UINT8 *report, int len) {
           case 0x01:
             if (m_ri->m_radar_type == RT_UNKNOWN) {
               LOG_INFO(wxT("BR24radar_pi: Radar report tells us this a Navico 4G"));
-              m_ri->m_radar_type = RT_4G;
-              m_pi->m_pMessageBox->SetRadarType(RT_4G);
+              m_ri->m_radar_type = Halo;
+              m_pi->m_pMessageBox->SetRadarType(Halo);
             }
             break;
           default:

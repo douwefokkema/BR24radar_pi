@@ -39,9 +39,9 @@ br24Transmit::br24Transmit(br24radar_pi *pi, wxString name, int radar) {
   memset(&m_addr, 0, sizeof(m_addr));
   m_addr.sin_family = AF_INET;
 
-  static UINT8 radar_mcast_send_addr[2][4] = {{236, 6, 7, 10}, {236, 6, 7, 14}};
+  static UINT8 radar_mcast_send_addr[2][4] = {{236, 6, 7, 101}, {236, 6, 7, 104}};
 
-  static unsigned short radar_mcast_send_port[2] = {6680, 6658};
+  static unsigned short radar_mcast_send_port[2] = {6133, 6136};
 
   memcpy(&m_addr.sin_addr.s_addr, radar_mcast_send_addr[radar % 2], sizeof(m_addr.sin_addr.s_addr));
   m_addr.sin_port = htons(radar_mcast_send_port[radar % 2]);

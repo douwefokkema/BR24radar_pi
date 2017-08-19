@@ -201,7 +201,7 @@ static string ControlTypeNames[CT_MAX] = {"Range",
 
 typedef enum GuardZoneType { GZ_ARC, GZ_CIRCLE } GuardZoneType;
 
-typedef enum RadarType { RT_UNKNOWN, RT_BR24, RT_3G, RT_4G } RadarType;
+typedef enum RadarType { RT_UNKNOWN, RT_BR24, RT_3G, RT_4G, Halo } RadarType;
 
 enum BlobColour {
   BLOB_NONE,
