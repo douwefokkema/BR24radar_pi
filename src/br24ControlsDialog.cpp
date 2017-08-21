@@ -1480,7 +1480,7 @@ void br24ControlsDialog::UpdateControlValues(bool refreshAll) {
   m_window_button->SetLabel(o);
 
   for (int b = 0; b < BEARING_LINES; b++) {
-    if (m_ri->m_vrm[b] != 0.0) {
+    if (!isnan(m_ri->m_vrm[b])) {
       o = _("Clear EBL/VRM");
       o << wxString::Format(wxT("%d"), b + 1);
     } else {
@@ -1532,6 +1532,12 @@ void br24ControlsDialog::UpdateControlValues(bool refreshAll) {
         o << _("Unknown");
     }
     m_orientation_button->SetLabel(o);
+  }
+  LOG_DIALOG(wxT("BR24radar_pi: orientation=%d heading source=%d"), m_ri->GetOrientation(), m_pi->m_heading_source);
+  if (m_pi->m_heading_source == HEADING_NONE) {
+    m_orientation_button->Disable();
+  } else {
+    m_orientation_button->Enable();
   }
 
   int overlay;

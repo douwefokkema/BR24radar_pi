@@ -29,10 +29,10 @@
  ***************************************************************************
  */
 
+#include "br24radar_pi.h"
 #include "GuardZoneBogey.h"
 #include "Kalman.h"
 #include "RadarMarpa.h"
-#include "br24radar_pi.h"
 #include "icons.h"
 #include "nmea0183/nmea0183.h"
 
@@ -298,6 +298,10 @@ int br24radar_pi::Init(void) {
   m_context_menu_set_marpa_target = AddCanvasContextMenuItem(mi4, this);
   m_context_menu_delete_marpa_target = AddCanvasContextMenuItem(mi5, this);
   m_context_menu_delete_all_marpa_targets = AddCanvasContextMenuItem(mi6, this);
+  m_context_menu_show = true;
+  m_context_menu_control = false;
+  m_context_menu_arpa = false;
+  SetCanvasContextMenuItemViz(m_context_menu_show_id, false);
 
   m_initialized = true;
   LOG_VERBOSE(wxT("BR24radar_pi: Initialized plugin transmit=%d/%d overlay=%d"), m_settings.show_radar[0], m_settings.show_radar[1],
@@ -415,29 +419,63 @@ void br24radar_pi::NotifyRadarWindowViz() { m_notify_radar_window_viz = true; }
 void br24radar_pi::NotifyControlDialog() { m_notify_control_dialog = true; }
 
 void br24radar_pi::SetRadarWindowViz(bool reparent) {
-  int arpa_targets = 0;
-
   for (int r = 0; r < RADARS; r++) {
     bool showThisRadar = m_settings.show && m_settings.show_radar[r] && (r == 0 || m_settings.enable_dual_radar);
     bool showThisControl = m_settings.show && m_settings.show_radar_control[r] && (r == 0 || m_settings.enable_dual_radar);
     m_radar[r]->ShowRadarWindow(showThisRadar);
     m_radar[r]->ShowControlDialog(showThisControl, reparent);
     m_radar[r]->UpdateTransmitState();
-    arpa_targets += m_radar[r]->m_arpa->GetTargetCount();
   }
-
-  SetCanvasContextMenuItemViz(m_context_menu_show_id, m_settings.show == 0);
-  SetCanvasContextMenuItemViz(m_context_menu_hide_id, m_settings.show != 0);
-  SetCanvasContextMenuItemViz(m_context_menu_control_id, m_settings.show != 0);
-  SetCanvasContextMenuItemViz(m_context_menu_control_id, m_settings.show != 0);
-  SetCanvasContextMenuItemViz(m_context_menu_set_marpa_target, m_settings.show != 0);
-  SetCanvasContextMenuItemViz(m_context_menu_delete_marpa_target, m_settings.show != 0);
-  SetCanvasContextMenuItemViz(m_context_menu_delete_all_marpa_targets, m_settings.show != 0);
-  SetCanvasContextMenuItemGrey(m_context_menu_delete_marpa_target, arpa_targets == 0);
-  SetCanvasContextMenuItemGrey(m_context_menu_delete_all_marpa_targets, arpa_targets == 0);
 
   LOG_DIALOG(wxT("BR24radar_pi: RadarWindow show = %d window0=%d window1=%d"), m_settings.show, m_settings.show_radar[0],
              m_settings.show_radar[1]);
+
+  UpdateContextMenu();
+}
+
+void br24radar_pi::UpdateContextMenu() {
+  int arpa_targets = 0;
+
+  for (int r = 0; r < RADARS; r++) {
+    arpa_targets += m_radar[r]->m_arpa->GetTargetCount();
+  }
+  bool show = m_settings.show;
+  bool control = false;
+  bool arpa = arpa_targets == 0;
+
+  if (m_settings.chart_overlay >= 0) {
+    control = m_settings.show_radar_control[m_settings.chart_overlay];
+  } else {
+    control = true;
+    for (int r = 0; r < RADARS; r++) {
+      if (!m_settings.show_radar_control[r]) {
+        control = false;
+      }
+    }
+  }
+
+  if (m_context_menu_arpa != arpa) {
+    SetCanvasContextMenuItemGrey(m_context_menu_delete_marpa_target, arpa);
+    SetCanvasContextMenuItemGrey(m_context_menu_delete_all_marpa_targets, arpa);
+    m_context_menu_arpa = arpa;
+    LOG_DIALOG(wxT("BR24radar_pi: ContextMenu arpa nr of targets = %d"), arpa_targets);
+  }
+  if (m_context_menu_control != control) {
+    SetCanvasContextMenuItemGrey(m_context_menu_control_id, control);
+    m_context_menu_control = control;
+    LOG_DIALOG(wxT("BR24radar_pi: ContextMenu control = %d"), control);
+  }
+
+  if (m_context_menu_show != show) {
+    SetCanvasContextMenuItemViz(m_context_menu_show_id, !show);
+    SetCanvasContextMenuItemViz(m_context_menu_hide_id, show);
+    SetCanvasContextMenuItemViz(m_context_menu_control_id, show);
+    SetCanvasContextMenuItemViz(m_context_menu_set_marpa_target, show);
+    SetCanvasContextMenuItemViz(m_context_menu_delete_marpa_target, show);
+    SetCanvasContextMenuItemViz(m_context_menu_delete_all_marpa_targets, show);
+    m_context_menu_show = show;
+    LOG_DIALOG(wxT("BR24radar_pi: ContextMenu show = %d"), show);
+  }
 }
 
 //********************************************************************************
@@ -535,10 +573,10 @@ void br24radar_pi::OnContextMenuItemCallback(int id) {
       ShowRadarControl(m_settings.chart_overlay, true);
     }
   } else if (id == m_context_menu_hide_id) {
-    m_settings.show = 0;
+    m_settings.show = false;
     SetRadarWindowViz();
   } else if (id == m_context_menu_show_id) {
-    m_settings.show = 1;
+    m_settings.show = true;
     SetRadarWindowViz();
   } else if (id == m_context_menu_set_marpa_target) {
     if (m_settings.show                                                             // radar shown
@@ -558,11 +596,8 @@ void br24radar_pi::OnContextMenuItemCallback(int id) {
       Position target_pos;
       target_pos.lat = m_cursor_lat;
       target_pos.lon = m_cursor_lon;
-      if (m_radar[0]->m_arpa) {
-        m_radar[0]->m_arpa->DeleteTarget(target_pos);
-      }
-      if (m_radar[1]->m_arpa) {
-        m_radar[1]->m_arpa->DeleteTarget(target_pos);
+      if (m_radar[m_settings.chart_overlay]->m_arpa) {
+          m_radar[m_settings.chart_overlay]->m_arpa->DeleteTarget(target_pos);
       }
     }
   } else if (id == m_context_menu_delete_all_marpa_targets) {
@@ -826,21 +861,6 @@ void br24radar_pi::UpdateHeadingState(time_t now) {
     m_var_source = VARIATION_SOURCE_NONE;
     LOG_VERBOSE(wxT("BR24radar_pi: Lost Variation source"));
   }
-
-  // check for no longer allowed value
-  if (m_heading_source == HEADING_NONE) {
-    for (int i = 0; i < RADARS; i++) {
-      if (m_radar[i]->m_orientation.GetValue() != ORIENTATION_HEAD_UP) {
-        m_radar[i]->m_orientation.Update(ORIENTATION_HEAD_UP);
-      }
-    }
-  } else {
-    for (int i = 0; i < RADARS; i++) {
-      if (m_radar[i]->m_orientation.GetValue() == ORIENTATION_HEAD_UP) {
-        m_radar[i]->m_orientation.Update(ORIENTATION_STABILIZED_UP);
-      }
-    }
-  }
 }
 
 double br24radar_pi::GetHeadingTrue() {
@@ -869,7 +889,7 @@ void br24radar_pi::Notify(void) {
     SetRadarWindowViz(true);
     updateAllControls = true;
   } else {
-    SetRadarWindowViz();
+    UpdateContextMenu();
   }
 
   if (!m_settings.show  // No radar shown
@@ -1559,12 +1579,12 @@ bool br24radar_pi::SetControlValue(int radar, ControlType controlType, int value
   switch (controlType) {
     case CT_TRANSPARENCY: {
       m_settings.overlay_transparency = value;
-      m_radar[1 - radar]->UpdateControlState(true); // Update the controls in the other radar
+      m_radar[1 - radar]->UpdateControlState(true);  // Update the controls in the other radar
       return true;
     }
     case CT_SCAN_AGE: {
       m_settings.max_age = value;
-      m_radar[1 - radar]->UpdateControlState(true); // Update the controls in the other radar
+      m_radar[1 - radar]->UpdateControlState(true);  // Update the controls in the other radar
       return true;
     }
     case CT_TIMED_IDLE: {
@@ -1576,17 +1596,17 @@ bool br24radar_pi::SetControlValue(int radar, ControlType controlType, int value
       } else {
         m_idle_transmit = time(0) + 10;
       }
-      m_radar[1 - radar]->UpdateControlState(true); // Update the controls in the other radar
+      m_radar[1 - radar]->UpdateControlState(true);  // Update the controls in the other radar
       return true;
     }
     case CT_TIMED_RUN: {
       m_settings.idle_run_time = value;
-      m_radar[1 - radar]->UpdateControlState(true); // Update the controls in the other radar
+      m_radar[1 - radar]->UpdateControlState(true);  // Update the controls in the other radar
       return true;
     }
     case CT_REFRESHRATE: {
       m_settings.refreshrate = value;
-      m_radar[1 - radar]->UpdateControlState(true); // Update the controls in the other radar
+      m_radar[1 - radar]->UpdateControlState(true);  // Update the controls in the other radar
       return true;
     }
     case CT_TARGET_TRAILS: {
@@ -1603,7 +1623,7 @@ bool br24radar_pi::SetControlValue(int radar, ControlType controlType, int value
     }
     case CT_MAIN_BANG_SIZE: {
       m_settings.main_bang_size = value;
-      m_radar[1 - radar]->UpdateControlState(true); // Update the controls in the other radar
+      m_radar[1 - radar]->UpdateControlState(true);  // Update the controls in the other radar
       return true;
     }
 

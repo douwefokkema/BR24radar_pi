@@ -339,9 +339,6 @@ void RadarArpa::AcquireOrDeleteMarpaTarget(Position target_pos, int status) {
     }
     i_target = m_number_of_targets;
     m_number_of_targets++;
-    if (m_number_of_targets == 1) {
-      m_pi->NotifyControlDialog();
-    }
   } else {
     LOG_INFO(wxT("BR24radar_pi: RadarArpa:: Error, max targets exceeded "));
     return;
@@ -541,7 +538,7 @@ void RadarArpa::DrawContour(ArpaTarget* target) {
       return;
     }
     vertex_array[2 * i] = polarLookup->x[angle][radius] * m_ri->m_range_meters / RETURNS_PER_LINE;
-    vertex_array[2 * i + 1] = polarLookup->y[angle][radius] * m_ri->m_range_meters / RETURNS_PER_LINE; 
+    vertex_array[2 * i + 1] = polarLookup->y[angle][radius] * m_ri->m_range_meters / RETURNS_PER_LINE;
   }
 
   glVertexPointer(2, GL_DOUBLE, 0, vertex_array);
@@ -577,7 +574,6 @@ void RadarArpa::DrawContour(ArpaTarget* target) {
     glVertex2f(xx, yy);
   }
 #endif
-
 }
 
 void RadarArpa::DrawArpaTargets() {
@@ -589,27 +585,30 @@ void RadarArpa::DrawArpaTargets() {
   }
 }
 
-void RadarArpa::RefreshArpaTargets() {
+void RadarArpa::CleanUpLostTargets() {
   // remove targets with status LOST and put them at the end
-
-  for (int i = 0; i < m_number_of_targets; i++) {
-    if (m_targets[i]) {
-      if (m_targets[i]->m_status == LOST) {
+  // adjust m_number_of_targets
+  int ii = 0;
+  while (ii < m_number_of_targets) {
+    if (m_targets[ii]) {
+      if (m_targets[ii]->m_status == LOST) {
         // we keep the lost target for later use, destruction and construction is expensive
-        ArpaTarget* lost = m_targets[i];
+        ArpaTarget* lost = m_targets[ii];
         int len = sizeof(ArpaTarget*);
         // move rest of larget list up to keep them in sequence
-        memmove(&m_targets[i], &m_targets[i] + 1, (m_number_of_targets - i) * len);
+        memmove(&m_targets[ii], &m_targets[ii] + 1, (m_number_of_targets - ii) * len);
         m_number_of_targets--;
         // set the lost target at the last position
         m_targets[m_number_of_targets] = lost;
-        if (m_number_of_targets == 1) {
-          m_pi->NotifyControlDialog();
-        }
+      } else {
+        ii++;
       }
     }
   }
+}
 
+void RadarArpa::RefreshArpaTargets() {
+  CleanUpLostTargets();
   int target_to_delete = -1;
   // find a target with status FOR_DELETION if it is there
   for (int i = 0; i < m_number_of_targets; i++) {
@@ -639,6 +638,8 @@ void RadarArpa::RefreshArpaTargets() {
       m_targets[del_target]->SetStatusLost();
     }
     m_targets[target_to_delete]->SetStatusLost();
+    // now first clean up the lost targets again
+    CleanUpLostTargets();
   }
 
   ArpaTarget t;
@@ -1144,9 +1145,6 @@ int RadarArpa::AcquireNewARPATarget(Polar pol, int status) {
     }
     i = m_number_of_targets;
     m_number_of_targets++;
-    if (m_number_of_targets == 1) {
-      m_pi->NotifyControlDialog();
-    }
   } else {
     LOG_INFO(wxT("BR24radar_pi: RadarArpa:: Error, max targets exceeded %i"), m_number_of_targets);
     return -1;
