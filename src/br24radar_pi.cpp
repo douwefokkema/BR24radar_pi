@@ -1090,7 +1090,7 @@ bool br24radar_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp) {
   wxPoint boat_center;
   GetCanvasPixLL(vp, &boat_center, m_ownship_lat, m_ownship_lon);
 
-  m_radar[m_settings.chart_overlay]->SetAutoRangeMeters(auto_range_meters);
+//  m_radar[m_settings.chart_overlay]->SetAutoRangeMeters(auto_range_meters);  // mot foe test $$$
 
   //    Calculate image scale factor
   double llat, llon, ulat, ulon, dist_y, v_scale_ppm;

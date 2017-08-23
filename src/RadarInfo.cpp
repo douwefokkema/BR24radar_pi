@@ -86,8 +86,8 @@ static const RadarRange g_ranges_nautic[] = {{50, 98, "50 m", 0, 0, 0},
                                              {1852 * 8, 22208, "8 NM", "2", "4", "6"},
                                              {1852 * 12, 36352, "12 NM", "3", "6", "9"},
                                              {1852 * 16, 44416, "16 NM", "4", "8", "12"},
-                                             {1852 * 24, 72704, "24 NM", "6", "12", "18"},
-                                             {1852 * 36, 72704, "36 NM", "9", "18", "27"}};
+                                             {1852 * 24, 52988, "24 NM", "6", "12", "18"}, // adapted halo
+                                             {1852 * 36, 78130, "36 NM", "9", "18", "27"}};// adapted halo
 
 static const int METRIC_RANGE_COUNT = ARRAY_SIZE(g_ranges_metric);
 static const int NAUTIC_RANGE_COUNT = ARRAY_SIZE(g_ranges_nautic);

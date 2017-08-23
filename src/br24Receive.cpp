@@ -221,7 +221,7 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
     short int rotation_raw;
     int range_meters = 0;
 
-    heading_raw = ((line->common.heading[1] & 15) << 8) | line->common.heading[0];  // this change also applies to 4G
+    heading_raw = (line->common.heading[1] << 8) | line->common.heading[0];
     unsigned int large_range;  // for Halo unsigned
     unsigned int small_range;
     if (memcmp(line->br24.mark, BR24MARK, sizeof(BR24MARK)) == 0) {
@@ -236,7 +236,7 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
       }
     } else {
       // 4G mode
-    //    LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
+      //    LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
       large_range = (line->br4g.largerange[1] << 8) | line->br4g.largerange[0];
       small_range = (line->br4g.smallrange[1] << 8) | line->br4g.smallrange[0];
       angle_raw = (line->br4g.angle[1] << 8) | line->br4g.angle[0];
@@ -246,38 +246,36 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
           range_raw = 0;  // Invalid range received
         } else {
           range_raw = small_range;
-          range_meters = range_raw / 4;
+          range_meters = range_raw / 4;  // for 4G
         }
-      } else {
-      //  range_raw = large_range * 256;  // for 4G
-          if (small_range == 512) {
-              range_raw = large_range; // for Halo
-            
-              LOG_INFO(wxT("BR24radar_pi: $$$ small range is 512 small_range = %d, large_range= %d"), small_range, large_range);
-              
-          }
-          else {
-              range_raw = 0;  // Invalid range received
-              
-              LOG_INFO(wxT("BR24radar_pi: $$$ invalid range small_range = %d, large_range= %d"), small_range, large_range);
-          
-          }
-          range_meters = range_raw;
-      }
- //     range_meters = range_raw / 4;  // for 4G
-      if (m_ri->m_radar_type != RT_4G) {
-        LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
-        m_ri->m_radar_type = RT_4G;
-        m_pi->m_pMessageBox->SetRadarType(RT_4G);
-      }
-    }
+      } else if (small_range == 512) {
+        //  range_raw = large_range * 256;  // for 4G
 
-    // if (angle_raw < 4) {
-    {
-      IF_LOG_AT(LOGLEVEL_RECEIVE,
-                logBinaryData(wxString::Format(wxT("range=%d, angle=%d hdg=%d small range=%d, large range=%d, range_meters=%d"), range_raw, angle_raw, heading_raw,
-                small_range, large_range, range_meters),
-                (uint8_t *)&line->br24, sizeof(line->br24)));
+        range_raw = large_range;  // for Halo
+
+        LOG_INFO(wxT("BR24radar_pi: $$$ small range is 512 small_range = %d, large_range= %d"), small_range, large_range);
+
+      } else if (small_range == 1024) {
+        range_raw = large_range * 2;  // for Halo
+
+        LOG_INFO(wxT("BR24radar_pi: $$$ small range is 1024 small_range = %d, large_range= %d"), small_range, large_range);
+      }
+      range_meters = range_raw;
+    
+    //     range_meters = range_raw / 4;  // for 4G
+    if (m_ri->m_radar_type != RT_4G) {
+      LOG_INFO(wxT("BR24radar_pi: %s is Navico type 4G or Halo"), m_ri->m_name.c_str());
+      m_ri->m_radar_type = RT_4G;
+      m_pi->m_pMessageBox->SetRadarType(RT_4G);
+    }
+  }
+
+  // if (angle_raw < 4) {
+  {
+    IF_LOG_AT(LOGLEVEL_RECEIVE,
+              logBinaryData(wxString::Format(wxT("range=%d, angle=%d hdg=%d small range=%d, large range=%d, range_meters=%d"),
+                                             range_raw, angle_raw, heading_raw, small_range, large_range, range_meters),
+                            (uint8_t *)&line->br24, sizeof(line->br24)));
     }
 
     bool radar_heading_valid = HEADING_VALID(heading_raw);
