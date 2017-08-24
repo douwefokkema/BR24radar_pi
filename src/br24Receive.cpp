@@ -244,27 +244,22 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
       if (large_range == 0x80) {
         if (small_range == -1) {
             range_meters = 0;  // Invalid range received
-        //  LOG_INFO(wxT("BR24radar_pi: $$$ illegal range small_range = %d, large_range= %d"), small_range, large_range);
 
         } else {
-          range_meters = small_range / 4;  // for 4G
-       //   LOG_INFO(wxT("BR24radar_pi: $$$ small_range = %d, large_range= %d range_meters=%d"), small_range, large_range, range_meters);
+          range_meters = small_range / 4;  // for 4G );
         }
       } else if (small_range == 512) {
         //  range_raw = large_range * 256;  // for 4G
 
         range_meters = large_range;  // for Halo
-        LOG_INFO(wxT("BR24radar_pi: $$$ small range is 512 small_range = %d, large_range= %d"), small_range, large_range);
 
       } else if (small_range == 1024) {
         // for Halo
         range_meters = large_range * 2;
-        LOG_INFO(wxT("BR24radar_pi: $$$ small range is 1024 small_range = %d, large_range= %d"), small_range, large_range);
       }
       else if (small_range == 2048) {
           // for Halo
           range_meters = large_range * 4;
-          LOG_INFO(wxT("BR24radar_pi: $$$ small range is 2048 small_range = %d, large_range= %d"), small_range, large_range);
       }
     
     //     range_meters = range_raw / 4;  // for 4G
@@ -290,7 +285,6 @@ void br24Receive::ProcessFrame(const UINT8 *data, int len) {
 
     if (radar_heading_valid && !m_pi->m_settings.ignore_radar_heading) {
       heading = MOD_DEGREES(SCALE_RAW_TO_DEGREES(MOD_ROTATION(heading_raw)));
-     // LOG_INFO(wxT("BR24radar_pi: %s $$$heading on radar %i, %f"), m_ri->m_name.c_str(), heading_raw, heading);
       m_pi->SetRadarHeading(heading, radar_heading_true);
       
     } else {  // no heading on radar
@@ -857,7 +851,7 @@ bool br24Receive::ProcessReport(const UINT8 *report, int len) {
 
         LOG_INFO(wxT("BR24radar_pi: %s state range=%u gain=%u sea=%u rain=%u if_rejection=%u tgt_boost=%u tgt_expansion=%u"),
                     m_ri->m_name.c_str(), s->range, s->gain, s->sea, s->rain, s->interference_rejection, s->target_boost,
-                    s->target_expansion);  // was log receive $$$
+                    s->target_expansion);
         break;
       }
 

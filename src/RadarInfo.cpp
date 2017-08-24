@@ -121,10 +121,8 @@ static size_t convertMetersToRadarAllowedValue(int *range_meters, int units, Rad
 
 static int convertSpokeMetersToRangeMeters(int value) {
   int g;
-  LOG_INFO(wxT("BR24radar_pi: $$$$ convertSpokeMetersToRangeMeters value=%i"), value);
   for (g = 0; g < ARRAY_SIZE(g_ranges_nautic); g++) {
     if (g_ranges_nautic[g].actual_meters == value) {
-        LOG_INFO(wxT("BR24radar_pi: $$$$ convertSpokeMetersToRangeMeters return  g_ranges_nautic[g].meters=%i"), g_ranges_nautic[g].meters);
       return g_ranges_nautic[g].meters;
     }
   }
@@ -151,18 +149,15 @@ void radar_range_control_item::Update(int v) {
   m_settings->range_units = RANGE_NAUTICAL;  // $$$ only for halo
 
   if (m_settings->range_units == RANGE_NAUTICAL) {
-      LOG_INFO(wxT("BR24radar_pi: $$$$ find range0 m_value=%i"), m_value);
       for (g = 0; g < ARRAY_SIZE(g_ranges_nautic) - 1; g++) {
           if (g_ranges_nautic[g].meters <= m_value && m_value < g_ranges_nautic[g + 1].meters) {
               newRange = &g_ranges_nautic[g];
-              LOG_INFO(wxT("BR24radar_pi: $$$$ new range0 found g=%i, actual meters=%i"), g, newRange->actual_meters);
               break;
           }
       }
         g = ARRAY_SIZE(g_ranges_nautic) - 1;
         if (g_ranges_nautic[g].meters == m_value) {
             newRange = &g_ranges_nautic[g];
-            LOG_INFO(wxT("BR24radar_pi: $$$$ new range0 found g=%i, actual meters=%i"), g, newRange->actual_meters);
         }
 
       
@@ -176,11 +171,9 @@ void radar_range_control_item::Update(int v) {
     }
   }*/
   if (!newRange) {
-      LOG_INFO(wxT("BR24radar_pi: $$$$ find range1 m_value=%i"), m_value);
     for (g = 0; g < ARRAY_SIZE(g_ranges_nautic); g++) {
       if (g_ranges_nautic[g].meters == m_value) {
         newRange = &g_ranges_nautic[g];
-        LOG_INFO(wxT("BR24radar_pi: $$$$ new range1 found g=%i, actual meters=%i"), g, newRange->actual_meters);
         break;
       }
     }
@@ -494,7 +487,7 @@ void RadarInfo::ProcessRadarSpoke(SpokeBearing angle, SpokeBearing bearing, UINT
     m_range_meters = range_meters;
    if (!m_range.GetValue()) {
         LOG_VERBOSE(wxT("BR24radar_pi: convertSpokeMetersToRangeMeters called"));
-      m_range.Update(convertSpokeMetersToRangeMeters(range_meters));  // $$$$
+      m_range.Update(convertSpokeMetersToRangeMeters(range_meters));
     }
   }
 
