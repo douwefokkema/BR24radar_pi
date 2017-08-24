@@ -70,24 +70,27 @@ static const RadarRange g_ranges_metric[] = {
     {36000, 52480, "36 km", "9", "18", "27"},
     {48000, 72704, "48 km", "12", "24", "36"}};
 
+// all nautical ranges adapted for Halo
+
 static const RadarRange g_ranges_nautic[] = {{50, 98, "50 m", 0, 0, 0},
-                                             {75, 146, "75 m", 0, 0, 0},
-                                             {100, 195, "100 m", "25", "50", "75"},
-                                             {1852 / 8, 451, "1/8 NM", 0, "1/16", 0},
-                                             {1852 / 4, 673, "1/4 NM", "1/32", "1/8", 0},
-                                             {1852 / 2, 1389, "1/2 NM", "1/8", "1/4", "3/8"},
-                                             {1852 * 3 / 4, 2020, "3/4 NM", 0, "3/8", 0},
-                                             {1852 * 1, 2693, "1 NM", "1/4", "1/2", "3/4"},
-                                             {1852 * 3 / 2, 4039, "1.5 NM", "3/8", "3/4", 0},
-                                             {1852 * 2, 5655, "2 NM", "0.5", "1.0", "1.5"},
-                                             {1852 * 3, 8079, "3 NM", "0.75", "1.5", "2.25"},
-                                             {1852 * 4, 10752, "4 NM", "1", "2", "3"},
-                                             {1852 * 6, 16128, "6 NM", "1.5", "3", "4.5"},
-                                             {1852 * 8, 22208, "8 NM", "2", "4", "6"},
-                                             {1852 * 12, 36352, "12 NM", "3", "6", "9"},
-                                             {1852 * 16, 44416, "16 NM", "4", "8", "12"},
-                                             {1852 * 24, 52988, "24 NM", "6", "12", "18"}, // adapted halo
-                                             {1852 * 36, 78130, "36 NM", "9", "18", "27"}};// adapted halo
+                                             {75, 161, "75 m", 0, 0, 0},
+                                             {100, 214, "100 m", "25", "50", "75"},
+                                             {1852 / 8, 407, "1/8 NM", 0, "1/16", 0},
+                                             {1852 / 4, 814, "1/4 NM", "1/32", "1/8", 0},
+                                             {1852 / 2, 1628, "1/2 NM", "1/8", "1/4", "3/8"}, /*adapted halo*/
+                                             {1852 * 3 / 4, 2442, "3/4 NM", 0, "3/8", 0},
+                                             {1852 * 1, 3255, "1 NM", "1/4", "1/2", "3/4"},
+                                             {1852 * 3 / 2, 4883, "1.5 NM", "3/8", "3/4", 0},
+                                             {1852 * 2, 6511, "2 NM", "0.5", "1.0", "1.5"},
+                                             {1852 * 3, 9766, "3 NM", "0.75", "1.5", "2.25"},
+                                             {1852 * 4, 13022, "4 NM", "1", "2", "3"},
+                                             {1852 * 6, 19533, "6 NM", "1.5", "3", "4.5"},
+                                             {1852 * 8, 26044, "8 NM", "2", "4", "6"},
+                                             {1852 * 12, 39066, "12 NM", "3", "6", "9"},
+                                             {1852 * 16, 52088, "16 NM", "4", "8", "12"},
+                                             {1852 * 24, 78130, "24 NM", "6", "12", "18"},   /*adapted halo*/
+                                             {1852 * 36, 117196, "36 NM", "9", "18", "27"},   /*adapted halo*/
+                                             {1852 * 48, 156260, "48 NM", "12", "24", "36"}};  /*adapted halo*/
 
 static const int METRIC_RANGE_COUNT = ARRAY_SIZE(g_ranges_metric);
 static const int NAUTIC_RANGE_COUNT = ARRAY_SIZE(g_ranges_nautic);
@@ -101,25 +104,27 @@ static size_t convertMetersToRadarAllowedValue(int *range_meters, int units, Rad
 
   n = g_range_maxValue[units];
   ranges = units ? g_ranges_metric : g_ranges_nautic;
-
-  if (radarType != RT_4G) {
-    n--;  // only 4G has longest ranges
-  }
+  // $$$ check for halo and 4G
+  //if (radarType != RT_4G) {
+  //  n--;  // only 4G has longest ranges
+  //}
   for (; n > 0; n--) {
     if (ranges[n].meters <= myrange) {  // step down until past the right range value
       break;
     }
   }
   *range_meters = ranges[n].meters;
+  LOG_INFO(wxT("BR24radar_pi: $$$$ find range step down  myrange=%i, m_value=%i"), myrange, ranges[n].meters);
 
   return n;
 }
 
 static int convertSpokeMetersToRangeMeters(int value) {
   int g;
-
+  LOG_INFO(wxT("BR24radar_pi: $$$$ convertSpokeMetersToRangeMeters value=%i"), value);
   for (g = 0; g < ARRAY_SIZE(g_ranges_nautic); g++) {
     if (g_ranges_nautic[g].actual_meters == value) {
+        LOG_INFO(wxT("BR24radar_pi: $$$$ convertSpokeMetersToRangeMeters return  g_ranges_nautic[g].meters=%i"), g_ranges_nautic[g].meters);
       return g_ranges_nautic[g].meters;
     }
   }
@@ -143,37 +148,51 @@ void radar_range_control_item::Update(int v) {
   // First we look up according to the desired setting (metric/nautical) and if
   // that doesn't work we look up nautical then metric.
 
+  m_settings->range_units = RANGE_NAUTICAL;  // $$$ only for halo
+
   if (m_settings->range_units == RANGE_NAUTICAL) {
-    for (g = 0; g < ARRAY_SIZE(g_ranges_nautic); g++) {
-      if (g_ranges_nautic[g].meters == m_value) {
-        newRange = &g_ranges_nautic[g];
-        break;
+      LOG_INFO(wxT("BR24radar_pi: $$$$ find range0 m_value=%i"), m_value);
+      for (g = 0; g < ARRAY_SIZE(g_ranges_nautic) - 1; g++) {
+          if (g_ranges_nautic[g].meters <= m_value && m_value < g_ranges_nautic[g + 1].meters) {
+              newRange = &g_ranges_nautic[g];
+              LOG_INFO(wxT("BR24radar_pi: $$$$ new range0 found g=%i, actual meters=%i"), g, newRange->actual_meters);
+              break;
+          }
       }
-    }
-  } else {
+        g = ARRAY_SIZE(g_ranges_nautic) - 1;
+        if (g_ranges_nautic[g].meters == m_value) {
+            newRange = &g_ranges_nautic[g];
+            LOG_INFO(wxT("BR24radar_pi: $$$$ new range0 found g=%i, actual meters=%i"), g, newRange->actual_meters);
+        }
+
+      
+    
+  } /*else {  // $$$ not for Halo
     for (g = 0; g < ARRAY_SIZE(g_ranges_metric); g++) {
       if (g_ranges_metric[g].meters == m_value) {
         newRange = &g_ranges_metric[g];
         break;
       }
     }
-  }
+  }*/
   if (!newRange) {
+      LOG_INFO(wxT("BR24radar_pi: $$$$ find range1 m_value=%i"), m_value);
     for (g = 0; g < ARRAY_SIZE(g_ranges_nautic); g++) {
       if (g_ranges_nautic[g].meters == m_value) {
         newRange = &g_ranges_nautic[g];
+        LOG_INFO(wxT("BR24radar_pi: $$$$ new range1 found g=%i, actual meters=%i"), g, newRange->actual_meters);
         break;
       }
     }
   }
-  if (!newRange) {
+  /*if (!newRange) {
     for (g = 0; g < ARRAY_SIZE(g_ranges_metric); g++) {
       if (g_ranges_metric[g].meters == m_value) {
         newRange = &g_ranges_metric[g];
         break;
       }
     }
-  }
+  }*/
 
   m_range = newRange;
 }
@@ -473,8 +492,9 @@ void RadarInfo::ProcessRadarSpoke(SpokeBearing angle, SpokeBearing bearing, UINT
     LOG_VERBOSE(wxT("BR24radar_pi: %s detected spoke range change from %d to %d meters"), m_name.c_str(), m_range_meters,
                 range_meters);
     m_range_meters = range_meters;
-    if (!m_range.GetValue()) {
-      m_range.Update(convertSpokeMetersToRangeMeters(range_meters));
+   if (!m_range.GetValue()) {
+        LOG_VERBOSE(wxT("BR24radar_pi: convertSpokeMetersToRangeMeters called"));
+      m_range.Update(convertSpokeMetersToRangeMeters(range_meters));  // $$$$
     }
   }
 
@@ -934,9 +954,9 @@ void RadarInfo::AdjustRange(int adjustment) {
       return;
     }
 
-    if (m_radar_type != RT_4G) {
-      max--;  // only 4G has longest ranges
-    }
+    //if (m_radar_type != RT_4G) {
+    //  max--;  // only 4G has longest ranges  // $$ adapt for Halo
+    //}
 
     if (adjustment > 0 && range > min) {
       LOG_VERBOSE(wxT("BR24radar_pi: Change radar range from %d/%d to %d/%d"), range[0].meters, range[0].actual_meters,
