@@ -1296,7 +1296,7 @@ void br24ControlsDialog::OnMessageButtonClick(wxCommandEvent& event) {
   }
 }
 
-void br24ControlsDialog::OnTargetsButtonClick(wxCommandEvent &event) {
+void br24ControlsDialog::OnTargetsButtonClick(wxCommandEvent& event) {
   M_SETTINGS.show_radar_target[m_ri->m_radar] = !(M_SETTINGS.show_radar_target[m_ri->m_radar]);
 
   UpdateControlValues(false);
@@ -1420,7 +1420,7 @@ void br24ControlsDialog::OnClearTrailsButtonClick(wxCommandEvent& event) { m_ri-
 void br24ControlsDialog::OnOrientationButtonClick(wxCommandEvent& event) {
   int value = m_ri->m_orientation.GetValue() + 1;
 
-  if (m_pi->m_heading_source == HEADING_NONE) {
+  if (m_pi->GetHeadingSource() == HEADING_NONE) {
     value = ORIENTATION_HEAD_UP;
   } else {  // There is a heading
     if (value == ORIENTATION_NUMBER) {
@@ -1514,18 +1514,7 @@ void br24ControlsDialog::UpdateControlValues(bool refreshAll) {
     }
     m_timed_idle_button->SetLocalValue(0);
   } else {
-    time_t now = time(0);
-    int left = m_pi->m_idle_standby - now;
-    if (left > 0) {
-      o << _("Standby in");
-      o << wxString::Format(wxT(" %d:%02d"), left / 60, left % 60);
-    } else {
-      left = m_pi->m_idle_transmit - now;
-      if (left >= 0) {
-        o << _("Transmit in");
-        o << wxString::Format(wxT(" %d:%02d"), left / 60, left % 60);
-      }
-    }
+    o << m_pi->GetTimedIdleText();
   }
   m_power_button->SetLabel(o);
   m_power_text->SetLabel(o);
@@ -1630,8 +1619,8 @@ void br24ControlsDialog::UpdateControlValues(bool refreshAll) {
     }
     m_orientation_button->SetLabel(o);
   }
-  LOG_DIALOG(wxT("BR24radar_pi: orientation=%d heading source=%d"), m_ri->GetOrientation(), m_pi->m_heading_source);
-  if (m_pi->m_heading_source == HEADING_NONE) {
+  LOG_DIALOG(wxT("BR24radar_pi: orientation=%d heading source=%d"), m_ri->GetOrientation(), m_pi->GetHeadingSource());
+  if (m_pi->GetHeadingSource() == HEADING_NONE) {
     m_orientation_button->Disable();
   } else {
     m_orientation_button->Enable();
@@ -1648,8 +1637,6 @@ void br24ControlsDialog::UpdateControlValues(bool refreshAll) {
     }
     m_overlay_button->SetLabel(o);
   }
-
-
 
   if (m_ri->m_range.IsModified() || refreshAll) {
     m_ri->m_range.GetButton();

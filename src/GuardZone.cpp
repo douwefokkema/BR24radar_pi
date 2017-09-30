@@ -35,8 +35,7 @@ PLUGIN_BEGIN_NAMESPACE
 
 #undef TEST_GUARD_ZONE_LOCATION
 
-GuardZone::GuardZone(br24radar_pi *pi, RadarInfo* ri, int zone)
-{
+GuardZone::GuardZone(br24radar_pi* pi, RadarInfo* ri, int zone) {
   m_pi = pi;
   m_ri = ri;
   m_log_name = wxString::Format(wxT("BR24radar_pi: Radar %c GuardZone %d:"), m_ri->m_radar + 'A', zone + 1);
@@ -51,7 +50,6 @@ GuardZone::GuardZone(br24radar_pi *pi, RadarInfo* ri, int zone)
   CLEAR_STRUCT(arpa_update_time);
   ResetBogeys();
 }
-
 
 void GuardZone::ProcessSpoke(SpokeBearing angle, UINT8* data, UINT8* hist, size_t len, int range) {
   size_t range_start = m_inner_range * RETURNS_PER_LINE / range;  // Convert from meters to 0..511
@@ -131,8 +129,10 @@ void GuardZone::ProcessSpoke(SpokeBearing angle, UINT8* data, UINT8* hist, size_
   m_last_angle = angle;
 }
 
-// Search  guard zone for ARPA targets
+// Search guard zone for ARPA targets
 void GuardZone::SearchTargets() {
+  Position own_pos;
+
   if (!m_arpa_on) {
     return;
   }
@@ -143,7 +143,7 @@ void GuardZone::SearchTargets() {
   if (!m_pi->m_settings.show  // No radar shown
       || (m_pi->m_radar[0]->m_state.GetValue() != RADAR_TRANSMIT &&
           m_pi->m_radar[1]->m_state.GetValue() != RADAR_TRANSMIT)  // Radar not transmitting
-      || !m_pi->m_bpos_set) {                                      // No position
+      || !m_pi->GetRadarPosition(&own_pos.lat, &own_pos.lon)) {    // No position
     return;
   }
   if (m_ri->m_range_meters == 0) {
@@ -194,16 +194,12 @@ void GuardZone::SearchTargets() {
             bool next_r = false;
             if (next_r) continue;
             // pixel found that does not belong to a known target
-            Position own_pos;
             Polar pol;
             pol.angle = angle;
             pol.r = rrr;
-            own_pos.lat = m_pi->m_radar_lat;
-            own_pos.lon = m_pi->m_radar_lon;
-            Position x;
-            x = Polar2Pos(pol, own_pos, m_ri->m_range_meters);
-            int target_i;
-            target_i = m_ri->m_arpa->AcquireNewARPATarget(pol, 0);
+
+            Position x = Polar2Pos(pol, own_pos, m_ri->m_range_meters);
+            int target_i = m_ri->m_arpa->AcquireNewARPATarget(pol, 0);
             if (target_i == -1) break;
           }
         }

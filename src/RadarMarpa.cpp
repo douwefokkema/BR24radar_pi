@@ -669,9 +669,8 @@ void RadarArpa::RefreshArpaTargets() {
     m_targets[i]->RefreshTarget(dist);
   }
 
-  for (int i = 0; i < GUARD_ZONES; i++)
-    m_ri->m_guard_zone[i]->SearchTargets();
-  }
+  for (int i = 0; i < GUARD_ZONES; i++) m_ri->m_guard_zone[i]->SearchTargets();
+}
 
 void ArpaTarget::RefreshTarget(int dist) {
   Position prev_X;
@@ -683,11 +682,9 @@ void ArpaTarget::RefreshTarget(int dist) {
   wxLongLong prev_refresh = m_refresh;
 
   // refresh may be called from guard directly, better check
-  if (m_status == LOST) {
+  if (m_status == LOST || !m_pi->GetRadarPosition(&own_pos.lat, &own_pos.lon)) {
     return;
   }
-  own_pos.lat = m_pi->m_radar_lat;
-  own_pos.lon = m_pi->m_radar_lon;
   pol = Pos2Polar(m_position, own_pos, m_ri->m_range_meters);
   wxLongLong time1 = m_ri->m_history[MOD_ROTATION2048(pol.angle)].time;
   int margin = SCAN_MARGIN;
@@ -900,8 +897,8 @@ void ArpaTarget::RefreshTarget(int dist) {
       }
       // Check for AIS target at (M)ARPA position
       double posOffset = (double)m_pi->m_settings.AISatARPAoffset;
-      // Default 18 >> look 36 meters around + 3% of distance to target
-      double dist2target = (3.0 / 100) * (double)pol.r / (double)RETURNS_PER_LINE * m_ri->m_range_meters;
+      // Default 40 >> look 80 meters around + 4% of distance to target
+      double dist2target = (4.0 / 100) * (double)pol.r / (double)RETURNS_PER_LINE * m_ri->m_range_meters;
       posOffset += dist2target;
       if (m_pi->FindAIS_at_arpaPos(m_position.lat, m_position.lon, posOffset)) s = L;
       PassARPAtoOCPN(&pol, s);
@@ -1124,8 +1121,10 @@ int RadarArpa::AcquireNewARPATarget(Polar pol, int status) {
   // constructs Kalman filter
   Position own_pos;
   Position target_pos;
-  own_pos.lat = m_pi->m_radar_lat;
-  own_pos.lon = m_pi->m_radar_lon;
+
+  if (!m_pi->GetRadarPosition(&own_pos.lat, &own_pos.lon)) {
+    return -1;
+  }
   target_pos = Polar2Pos(pol, own_pos, m_ri->m_range_meters);
   // make new target or re-use an existing one with status == lost
   int i;

@@ -35,6 +35,7 @@
 #define MY_API_VERSION_MAJOR 1
 #define MY_API_VERSION_MINOR 14  // Needed for PluginAISDrawGL().
 
+#include <vector>
 #include "jsonreader.h"
 #include "nmea0183/nmea0183.h"
 #include "pi_common.h"
@@ -98,6 +99,8 @@ typedef int SpokeBearing;  // A value from 0 -- LINES_PER_ROTATION indicating a 
 
 #define TIMED_OUT(t, timeout) (t >= timeout)
 #define NOT_TIMED_OUT(t, timeout) (!TIMED_OUT(t, timeout))
+
+#define VALID_GEO(x) (!isnan(x) && x >= -360.0 && x <= +360.0)
 
 #ifndef M_SETTINGS
 #define M_SETTINGS m_pi->m_settings
@@ -352,12 +355,13 @@ struct scan_line {
 };
 
 // Table for AIS targets inside ARPA zone
-#define SIZEAISAR (50)
 struct AisArpa {
   long ais_mmsi;
   time_t ais_time_upd;
   double ais_lat;
   double ais_lon;
+
+  AisArpa() : ais_mmsi(0), ais_time_upd(), ais_lat(), ais_lon() {}
 };
 
 //----------------------------------------------------------------------------------------------------------
@@ -419,6 +423,7 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
   void ShowGuardZoneDialog(int radar, int zone);
   void OnGuardZoneDialogClose(RadarInfo *ri);
   void ConfirmGuardZoneBogeys();
+  void ResetOpenGLContext();
 
   bool SetControlValue(int radar, ControlType controlType, int value, int autoValue);
 
@@ -430,6 +435,7 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
   long GetRangeMeters();
   long GetOptimalRangeMeters();
 
+  wxString GetTimedIdleText();
   wxString GetGuardZoneText(RadarInfo *ri);
 
   void SetMcastIPAddress(wxString &msg);
@@ -459,16 +465,24 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
     wxCriticalSectionLocker lock(m_exclusive);
     return m_cog;
   }
-  void GetRadarPosition(double *lat, double *lon) {
+  bool GetRadarPosition(double *lat, double *lon) {
     wxCriticalSectionLocker lock(m_exclusive);
 
-    *lat = m_radar_lat;
-    *lon = m_radar_lon;
+    if (m_bpos_set && VALID_GEO(m_radar_lat) && VALID_GEO(m_radar_lon)) {
+      *lat = m_radar_lat;
+      *lon = m_radar_lon;
+      return true;
+    }
+    return false;
   }
+  HeadingSource GetHeadingSource() { return m_heading_source; }
+  bool IsInitialized() { return m_initialized; }
+  wxLongLong GetBootMillis() { return m_boot_time; }
+  bool IsOpenGLEnabled() { return m_opengl_mode == OPENGL_ON; }
+  wxGLContext *GetChartOpenGLContext();
 
   wxFont m_font;      // The dialog font at a normal size
   wxFont m_fat_font;  // The dialog font at a bigger size, bold
-  int m_display_width, m_display_height;
 
   PersistentSettings m_settings;
   RadarInfo *m_radar[RADARS];
@@ -476,37 +490,15 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
 
   br24MessageBox *m_pMessageBox;
   wxWindow *m_parent_window;
-  wxGLContext *m_opencpn_gl_context;
-  bool m_opencpn_gl_context_broken;
-
-  HeadingSource m_heading_source;
-  OpenGLMode m_opengl_mode;
-  volatile bool m_opengl_mode_changed;
-  bool m_bpos_set;
-  time_t m_bpos_timestamp;
-  time_t m_boot_timestamp;  // We wait for a few seconds before we start validity checks
-
-  // Cursor position. Used to show position in radar window
-  double m_cursor_lat, m_cursor_lon;
-  double m_ownship_lat, m_ownship_lon, m_radar_lat, m_radar_lon;
-
-  bool m_initialized;      // True if Init() succeeded and DeInit() not called yet.
-  bool m_first_init;       // True in first Init() call.
-  wxLongLong m_boot_time;  // millis when started
-
-  // Timed Transmit
-  time_t m_idle_standby;   // When we will change to standby
-  time_t m_idle_transmit;  // When we will change to transmit
 
   // Check for AIS targets inside ARPA zone
-  AisArpa ais_in_arpa[SIZEAISAR];
-  int count_ais_in_arpa;
+  vector<AisArpa> m_ais_in_arpa_zone;  // Array for AIS targets in ARPA zone(s)
   bool FindAIS_at_arpaPos(const double &lat, const double &lon, const double &dist);
 
  private:
   void RadarSendState(void);
   void UpdateState(void);
-  void UpdateHeadingState();
+  void UpdateHeadingPositionState(void);
   void DoTick(void);
   void Select_Clutter(int req_clutter_index);
   void Select_Rejection(int req_rejection_index);
@@ -522,6 +514,7 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
   void OnTimerNotify(wxTimerEvent &event);
   void TimedControlUpdate();
   void ScheduleWindowRefresh();
+  void SetOpenGLMode(OpenGLMode mode);
 
   wxCriticalSection m_exclusive;  // protects callbacks that come from multiple radars
 
@@ -533,6 +526,9 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
   double m_radar_heading;          // Last heading obtained from radar, or nan if none
   bool m_radar_heading_true;       // Was TRUE flag set on radar heading?
   time_t m_radar_heading_timeout;  // When last heading was obtained from radar, or 0 if not
+  HeadingSource m_heading_source;
+  bool m_bpos_set;
+  time_t m_bpos_timestamp;
 
   // Variation. Used to convert magnetic into true heading.
   // Can come from SetPositionFixEx, which may hail from the WMM plugin
@@ -592,6 +588,24 @@ class br24radar_pi : public opencpn_plugin_114, public wxEvtHandler {
   bool m_context_menu_show;
   bool m_context_menu_control;
   bool m_context_menu_arpa;
+
+  // Cursor position. Used to show position in radar window
+  double m_cursor_lat, m_cursor_lon;
+  double m_ownship_lat, m_ownship_lon, m_radar_lat, m_radar_lon;
+
+  bool m_initialized;      // True if Init() succeeded and DeInit() not called yet.
+  bool m_first_init;       // True in first Init() call.
+  wxLongLong m_boot_time;  // millis when started
+
+  // Timed Transmit
+  time_t m_idle_standby;   // When we will change to standby
+  time_t m_idle_transmit;  // When we will change to transmit
+
+  OpenGLMode m_opengl_mode;
+  volatile bool m_opengl_mode_changed;
+
+  wxGLContext *m_opencpn_gl_context;
+  bool m_opencpn_gl_context_broken;
 
   wxTimer *m_timer;
 
