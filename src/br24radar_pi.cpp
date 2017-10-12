@@ -816,7 +816,7 @@ void br24radar_pi::SetRadarHeading(double heading, bool isTrue) {
     }
   } else if (m_heading_source == HEADING_RADAR_HDM || m_heading_source == HEADING_RADAR_HDT) {
     // no heading on radar and heading source is still radar
-    m_heading_source = HEADING_NONE;
+    m_heading_source = HEADING_NMEA_HDM;
   }
 }
 
