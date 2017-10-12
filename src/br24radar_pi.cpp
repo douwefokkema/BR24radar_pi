@@ -789,6 +789,9 @@ void br24radar_pi::CheckTimedTransmit(RadarState state) {
 
 void br24radar_pi::SetRadarHeading(double heading, bool isTrue) {
   wxCriticalSectionLocker lock(m_exclusive);
+  if (heading != m_radar_heading && !wxIsNaN(m_radar_heading)){
+    LOG_VERBOSE(wxT("BR24radar_pi: $$$ radar heading changed old heading= %f, new heading= %f"), m_radar_heading, heading);
+  }
   m_radar_heading = heading;
   m_radar_heading_true = isTrue;
   time_t now = time(0);
@@ -900,7 +903,7 @@ void br24radar_pi::ScheduleWindowRefresh() {
     millis = (1000 - drawTime) / (1 << (m_settings.refreshrate - 1)) + drawTime;
 
     m_timer->StartOnce(millis);
-    LOG_VERBOSE(wxT("BR24radar_pi: rendering PPI window(s) took %dms, next extra render is in %dms"), drawTime, millis);
+  //  LOG_VERBOSE(wxT("BR24radar_pi: rendering PPI window(s) took %dms, next extra render is in %dms"), drawTime, millis);
   } else {
     LOG_VERBOSE(wxT("BR24radar_pi: rendering PPI window(s) took %dms, refreshrate=%d, no next extra render"), drawTime,
                 m_settings.refreshrate);
@@ -909,7 +912,7 @@ void br24radar_pi::ScheduleWindowRefresh() {
 
 void br24radar_pi::OnTimerNotify(wxTimerEvent &event) {
   if (m_settings.show) {  // Is radar enabled?
-    LOG_INFO(wxT("BR24radar_pi: TIMER"));
+  //  LOG_INFO(wxT("BR24radar_pi: TIMER"));
 
     if (m_settings.chart_overlay >= 0) {
       // If overlay is enabled schedule another chart draw. Note this will cause another call to RenderGLOverlay,
